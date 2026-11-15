@@ -186,3 +186,21 @@ def test_rule_label_follows_the_intensity_rubric():
     assert rule_label(None, "적자전환") == (4, -1)
     assert rule_label(-40, "적자지속") is None  # 사람이 붙인다
     assert rule_label(None, None) is None
+
+
+def test_items_without_a_flip_are_left_out_of_manipulated_scoring(tmp_path):
+    """뒤집기 글이 없는 뉴스를 '전원 실패'로 세어 틀린 판단으로 잡으면 안 된다."""
+    import yaml
+
+    from echoguard.mock import make_world
+    from echoguard.pipeline import run
+
+    cfg = yaml.safe_load((ROOT / "config" / "experiment.yaml").read_text(encoding="utf-8"))
+    items, written, clients = make_world(seed=cfg["seed"])
+    full = run(items, written, clients, cfg, tmp_path / "full.jsonl")
+    drop = {it.item_id for it in items[:30]}
+    fewer = {k: v for k, v in written.items() if not (k[0] in drop and k[1] == "fact_flip")}
+    part = run(items, fewer, clients, cfg, tmp_path / "part.jsonl")
+    assert part["H5_fake_corroboration_only"]["n_items"] < full["H5_fake_corroboration_only"]["n_items"]
+    pooled = "H4_guard_eval_with_manipulated_inputs"
+    assert part[pooled]["G1_agreement"]["n_wrong"] <= full[pooled]["G1_agreement"]["n_wrong"]

@@ -35,6 +35,12 @@ def analyze(records, items: list[NewsItem], clients: list[ModelClient], cfg: dic
     def arr(kind):
         return store.to_array(records, FIELD, kind, models, ids, n_runs)
 
+    # 모델에 실제로 보낸 (뉴스, 변형)만 채점한다. 뒤집기 글을 만들지 않은 뉴스는 그 변형에서 빠진다.
+    sent = {(r.item_id, r.perturbation) for r in records}
+
+    def asked(kind):
+        return np.array([(i, kind) in sent for i in ids])
+
     original = arr("original")
     lo, hi = metrics.bootstrap_ci(
         lambda idx: metrics.pairwise_error_correlation(original[:, idx, :], truth[idx]), len(items), seed=seed
@@ -86,9 +92,10 @@ def analyze(records, items: list[NewsItem], clients: list[ModelClient], cfg: dic
         "fake_corroboration": (verified, one * fake_n, zero),        # 조작된 글을 여러 건 보도처럼 꾸밈
     }
     per_kind = {name: metrics.model_answers(arr(name))[:, ev] for name in kinds}
-    pooled_ans = np.concatenate(list(per_kind.values()), axis=1)
-    pooled_world = np.tile(world, len(kinds))
-    tag, shown, indep = (np.concatenate([v[i] for v in kinds.values()]) for i in range(3))
+    keep = {name: asked(name)[ev] for name in kinds}
+    pooled_ans = np.concatenate([per_kind[n][:, keep[n]] for n in kinds], axis=1)
+    pooled_world = np.concatenate([world[keep[n]] for n in kinds])
+    tag, shown, indep = (np.concatenate([kinds[n][i][keep[n]] for n in kinds]) for i in range(3))
     report["H4_guard_eval_with_manipulated_inputs"] = {
         "G1_agreement": guard.evaluate(guard.g1_agreement(pooled_ans, thr), pooled_ans, pooled_world),
         "G2_agreement_source_tag": guard.evaluate(
@@ -100,18 +107,20 @@ def analyze(records, items: list[NewsItem], clients: list[ModelClient], cfg: dic
         ),
     }
 
-    report["H6_learned_guard"] = _learned_guard(records, items, models, families, ids, n_runs, truth, cfg)
+    report["H6_learned_guard"] = _learned_guard(records, items, models, families, ids, n_runs, truth, cfg, sent)
 
     # H5: 꾸며 낸 여러 건 보도만 따로 떼어 본다
-    fake = per_kind["fake_corroboration"]
+    kf = keep["fake_corroboration"]
+    fake, fw = per_kind["fake_corroboration"][:, kf], world[kf]
     report["H5_fake_corroboration_only"] = {
-        "G4a_count_reports": guard.evaluate(guard.g4_corroboration(fake, thr, one * fake_n, k), fake, world),
-        "G4b_count_independent": guard.evaluate(guard.g4_corroboration(fake, thr, zero, k), fake, world),
+        "n_items": int(kf.sum()),
+        "G4a_count_reports": guard.evaluate(guard.g4_corroboration(fake, thr, (one * fake_n)[kf], k), fake, fw),
+        "G4b_count_independent": guard.evaluate(guard.g4_corroboration(fake, thr, zero[kf], k), fake, fw),
     }
     return report
 
 
-def _learned_guard(records, items, models, families, ids, n_runs, truth, cfg) -> dict:
+def _learned_guard(records, items, models, families, ids, n_runs, truth, cfg, sent) -> dict:
     """학습하는 가드. 설정용 뉴스로 맞추고 평가용 뉴스로 채점한다."""
     k, fake_n, rate = cfg["guard"]["k_sources"], cfg["guard"]["fake_reports"], cfg["guard"]["review_rate"]
     verified = np.array([it.source_verified for it in items])
@@ -124,7 +133,7 @@ def _learned_guard(records, items, models, families, ids, n_runs, truth, cfg) ->
         "fact_flip": (verified, one, zero, True),
         "fake_corroboration": (verified, one * fake_n, zero, True),
     }
-    Xb, Xs, y, fabricated, group, tune = [], [], [], [], [], []
+    Xb, Xs, y, fabricated, group, tune, kept = [], [], [], [], [], [], []
     for name, (tag, shown, indep, fake) in kinds.items():
         direction = store.to_array(records, "direction", name, models, ids, n_runs)
         intensity = store.to_array(records, "intensity", name, models, ids, n_runs)
@@ -134,7 +143,9 @@ def _learned_guard(records, items, models, families, ids, n_runs, truth, cfg) ->
         fabricated.append(np.full(len(items), fake))
         group.append(np.arange(len(items)))
         tune.append(np.array([it.split == "tune" for it in items]))
-    Xb, Xs, y, fabricated, group, tune = (np.concatenate(v) for v in (Xb, Xs, y, fabricated, group, tune))
+        kept.append(np.array([(i, name) in sent for i in ids]))
+    kept = np.concatenate(kept)  # 보내지 않은 (뉴스, 변형)은 학습과 채점에서 뺀다
+    Xb, Xs, y, fabricated, group, tune = (np.concatenate(v)[kept] for v in (Xb, Xs, y, fabricated, group, tune))
     y = y.astype(int)
     variants = {
         "G5a_behavior_only": (Xb, learned_guard.BEHAVIOR),
@@ -170,7 +181,9 @@ def run(items, written, clients, cfg: dict, runs_path: Path) -> dict:
     runs_path에 이미 기록이 있으면 그만큼은 건너뛰고 이어서 한다.
     호출 도중 오류(잔액 부족, 하루 한도 등)가 나면 그때까지의 기록은 파일에 남는다.
     """
-    items = assign_split(items, cfg["dataset"]["n_tune"], cfg["seed"])
+    # 건수가 계획(100건)보다 적은 시범 실행에서는 같은 비율(6:4)로 나눈다
+    n_tune = min(cfg["dataset"]["n_tune"], round(len(items) * 0.6))
+    items = assign_split(items, n_tune, cfg["seed"])
     inputs = build_inputs(items, written, cfg["guard"]["fake_reports"])
     system = (ROOT / "prompts" / "institutional_system.txt").read_text(encoding="utf-8")
     done = {store.key(r) for r in store.load(runs_path)} if Path(runs_path).exists() else set()

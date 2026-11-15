@@ -46,7 +46,7 @@ def main(path: str, labeler: str = "minyoung") -> int:
     if not rows:
         print("채운 행이 없습니다.")
         return 1
-    items, flips, problems, differs, checked = [], [], [], [], 0
+    items, flips, problems, differs, skipped, checked = [], [], [], [], [], 0
     for n, row in rows:
         data = {k: (row.get(k) or None) for k in CSV_COLUMNS}
         data["labeler"] = labeler
@@ -74,10 +74,14 @@ def main(path: str, labeler: str = "minyoung") -> int:
             continue
         if item.n_reports < min(item.n_independent_sources, 5):
             problems.append(f"  {n}행: n_reports가 n_independent_sources보다 작습니다")
-        if not row.get("fact_flip_text"):
-            problems.append(f"  {n}행: fact_flip_text가 비어 있습니다")
+        flip = row.get("fact_flip_text", "")
+        if not flip:
+            problems.append(f"  {n}행: fact_flip_text가 비어 있습니다. 뒤집을 수 없는 건이면 '제외: 이유'라고 적으세요")
         items.append(item)
-        flips.append((item.item_id, row.get("fact_flip_text", "")))
+        if flip.startswith("제외"):  # 뒤집으면 말이 안 되는 건(예: 100% 넘는 증가). 뒤집기 변형에서 뺀다
+            skipped.append(f"  {item.item_id}: {flip}")
+        elif flip:
+            flips.append((item.item_id, flip))
     ids = [it.item_id for it in items]
     problems += [f"  item_id 중복: {i}" for i, c in Counter(ids).items() if c > 1]
     if problems:
@@ -105,6 +109,9 @@ def main(path: str, labeler: str = "minyoung") -> int:
     print("  direction_text: " + ", ".join(f"{k:+d} {direction.get(k, 0)}" for k in (-1, 0, 1)) + "  (고르게)")
     methods = Counter(it.label_method for it in items)
     print(f"  라벨 방식: 규칙 {methods.get('rule', 0)}, 직접 {methods.get('manual', 0)}")
+    if skipped:
+        print(f"  뒤집기 변형에서 뺀 뉴스 {len(skipped)}건:")
+        print("\n".join(skipped))
     if checked:
         print(f"\n직접 적은 값과 규칙 값 비교: {checked}건 중 {len(differs)}건이 다릅니다. 정답에는 규칙 값을 썼습니다.")
         print("\n".join(differs[:20]))
