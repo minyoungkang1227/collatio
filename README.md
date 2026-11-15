@@ -51,6 +51,10 @@ PYTHONPATH=src python -m echoguard.check             # 실제 모델 시험 호�
 
 API 키 준비는 [docs/setup.md](docs/setup.md), 뉴스 라벨링 순서는 [docs/labeling_guide.md](docs/labeling_guide.md).
 
+## 내 데이터로 돌려 보기, 의견 보내기
+
+다른 문서와 다른 모델 조합에 같은 방법을 적용하는 순서는 [docs/use_your_own_data.md](docs/use_your_own_data.md). 돌려 본 결과, 막힌 곳, 방법에 대한 이의는 [이슈](https://github.com/minyoungkang1227/echoguard/issues/new/choose)로 받는다.
+
 모의 실행의 숫자는 실제 모델과 무관하다. 되는 것과 안 되는 것은 [docs/architecture.md](docs/architecture.md) 6장.
 
 ## 한계
