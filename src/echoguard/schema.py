@@ -31,4 +31,7 @@ class RunRecord(BaseModel):
     output: InstitutionalOutput | RetailOutput | None  # None은 형식 위반으로 실패한 호출
     model_version: str
     called_at: str
+    input_tokens: int = 0
+    output_tokens: int = 0   # 모델의 '생각' 토큰 포함. 재요청이 있었으면 합계
+    raw: str | None = None   # 마지막 응답 원문. 형식 위반의 원인을 나중에 보기 위해 남긴다
     data_version: str

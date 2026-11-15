@@ -46,7 +46,10 @@ EchoGuard는 모델 내부를 보지 않는다. 같은 뉴스를 여러 모델�
 pip install -r requirements.txt
 pytest
 PYTHONPATH=src python -m echoguard.pipeline --mock   # 모의 모델로 전체 흐름 실행
+PYTHONPATH=src python -m echoguard.check             # 실제 모델 시험 호출 (API 키 필요)
 ```
+
+API 키 준비는 [docs/setup.md](docs/setup.md).
 
 모의 실행의 숫자는 실제 모델과 무관하다. 되는 것과 안 되는 것은 [docs/architecture.md](docs/architecture.md) 6장.
 

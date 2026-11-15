@@ -74,6 +74,7 @@ echoguard/
 ├── src/echoguard/
 │   ├── dataset.py  perturb.py  panel.py  store.py
 │   ├── metrics.py  guard.py    pipeline.py
+│   ├── clients.py  check.py    실제 모델 호출, 시험 호출
 │   ├── schema.py               모델 출력·기록 형식
 │   └── mock.py                 모의 뉴스와 모의 모델
 ├── tests/
@@ -93,7 +94,7 @@ PYTHONPATH=src python -m echoguard.pipeline --mock
 | 지표, 순열검정, 신뢰구간, 가드 G1~G4b | 됨, 테스트 있음 |
 | 조작 입력(source_swap, fact_flip, fake_corroboration)을 포함한 가드 평가 | 됨 |
 | G4의 실제 출처 조회 | 없음. 지금은 라벨의 독립 출처 수를 그대로 쓰는 상한선 |
-| 실제 모델 클라이언트 | 없음. 패널 모델을 정한 뒤 작성 |
+| 실제 모델 클라이언트 (Anthropic, OpenAI, Google) | 작성함. **실제 API로는 아직 한 번도 돌려 보지 않았다.** `python -m echoguard.check`로 확인 필요 |
 | 뉴스 데이터 | 없음. 라벨 양식만 있음 |
 | paraphrase·ai_style 변형 생성기 | 없음. 지금은 미리 써 둔 글을 받기만 함 |
 | 개인 트랙 | 출력 형식만 정의. 채점은 범주형이라 별도 지표가 필요 |

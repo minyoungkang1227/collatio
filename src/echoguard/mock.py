@@ -8,6 +8,7 @@ import json
 import random
 
 from .dataset import NewsItem
+from .panel import Completion
 from .perturb import PanelInput
 
 FAMILIES = {"a-large": "A", "a-small": "A", "b-large": "B", "b-small": "B", "c-one": "C"}
@@ -15,10 +16,13 @@ FAMILIES = {"a-large": "A", "a-small": "A", "b-large": "B", "b-small": "B", "c-o
 
 class MockClient:
     def __init__(self, name: str, beliefs: dict, noise: float, fail_rate: float, seed: int):
-        self.name, self.family, self.version = name, FAMILIES[name], "mock-0"
+        self.name, self.family = name, FAMILIES[name]
         self._beliefs, self._noise, self._fail, self._seed = beliefs, noise, fail_rate, seed
 
-    def complete(self, system: str, inp: PanelInput, run: int) -> str:
+    def complete(self, system: str, inp: PanelInput, run: int) -> Completion:
+        return Completion(self._answer(inp, run), 500, 20, "mock-0")
+
+    def _answer(self, inp: PanelInput, run: int) -> str:
         rng = random.Random(f"{self._seed}|{self.name}|{inp.item_id}|{inp.perturbation}|{run}")
         if rng.random() < self._fail:
             return "죄송하지만 투자 판단은 도와드리기 어렵습니다."  # 형식 위반

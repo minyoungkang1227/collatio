@@ -96,3 +96,28 @@ def test_fake_corroboration_text_cites_itself_with_invented_outlets():
     lines = text.split("\n")
     assert lines[0] == "[같은 내용 보도 3건]" and len(lines) == 4
     assert "가나경제 보도에 따르면" in lines[2] and "다라뉴스 보도에 따르면" in lines[3]
+
+
+def test_extract_json_accepts_fences_and_chatter():
+    from echoguard.panel import extract_json
+
+    assert extract_json('```json\n{"intensity": 3, "direction": -1}\n```') == '{"intensity": 3, "direction": -1}'
+    assert extract_json('판단 결과입니다: {"intensity": 2, "direction": 0} 이상입니다.') == '{"intensity": 2, "direction": 0}'
+    assert extract_json("죄송하지만 답할 수 없습니다.") == "죄송하지만 답할 수 없습니다."
+
+
+def test_config_panel_builds_six_clients_in_three_families():
+    from echoguard.clients import build_clients, cost_usd
+
+    cfg = yaml.safe_load((ROOT / "config" / "experiment.yaml").read_text(encoding="utf-8"))
+    clients = build_clients(cfg["panel"]["models"])          # 네트워크와 API 키 없이 만들어져야 한다
+    families = [c.family for c in clients]
+    assert len(clients) == 6 and {families.count(f) for f in set(families)} == {2}
+    sol = cfg["panel"]["models"][0]
+    assert cost_usd(sol, 1_000_000, 100_000) == pytest.approx(3.0)   # 2달러 + 10달러의 10분의 1
+
+
+def test_dataset_rejects_news_before_the_window():
+    cfg = yaml.safe_load((ROOT / "config" / "experiment.yaml").read_text(encoding="utf-8"))
+    latest = max(m["released"] for m in cfg["panel"]["models"] if "released" in m)
+    assert cfg["dataset"]["news_from"] > latest
