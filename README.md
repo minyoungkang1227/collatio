@@ -6,6 +6,10 @@ Black-box stress test for correlated errors across LLMs on Korean financial news
 
 > 상태: 모의 모델로 전체 흐름이 돈다. 실제 모델 호출, 뉴스 데이터, 실험 결과는 아직 없다.
 
+## 방향
+
+목적은 방어다. AI 사용이 늘면서 금융회사와 일반 이용자에게 생길 문제를 미리 찾고, 재고, 대안을 준비한다. 다루는 문제의 목록은 [docs/problem_register.md](docs/problem_register.md).
+
 ## 왜 만드나
 
 금융당국은 금융회사들이 비슷한 AI를 쓰면 판단이 한쪽으로 쏠릴 수 있다고 경고한다. 그런데 그 쏠림을 어떤 데이터로 어떻게 잴지는 정해진 게 없고, 제안된 지표들은 각 회사의 비공개 모델 내부를 봐야 계산할 수 있다.
