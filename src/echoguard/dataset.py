@@ -5,7 +5,7 @@ import random
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class NewsItem(BaseModel):
@@ -27,6 +27,12 @@ class NewsItem(BaseModel):
     split: Literal["tune", "eval"] | None = None
     labeler: str
 
+    @field_validator("direction_text", "direction_realized", mode="before")
+    @classmethod
+    def _direction_from_text(cls, v):
+        """파일에서 읽은 "-1", "0", "1"을 숫자로 바꾼다. 그 밖의 값은 그대로 두어 검사에서 걸리게 한다."""
+        return int(v) if isinstance(v, str) and v.strip() in ("-1", "0", "1") else v
+
 
 def load_labels(path: str | Path) -> list[NewsItem]:
     """라벨 CSV를 읽는다. 형식이 틀린 줄이 있으면 그 자리에서 멈춘다."""
@@ -37,6 +43,14 @@ def load_labels(path: str | Path) -> list[NewsItem]:
     if len(ids) != len(set(ids)):
         raise ValueError("item_id가 중복됩니다")
     return items
+
+
+def load_written(path: str | Path) -> dict[tuple[str, str], str]:
+    """미리 써 둔 변형 글을 읽는다. 키는 (item_id, 변형 이름), 값은 본문."""
+    if not Path(path).exists():
+        return {}
+    with open(path, encoding="utf-8", newline="") as f:
+        return {(row["item_id"], row["perturbation"]): row["text"] for row in csv.DictReader(f) if row["text"]}
 
 
 def assign_split(items: list[NewsItem], n_tune: int, seed: int) -> list[NewsItem]:

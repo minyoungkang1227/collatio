@@ -75,10 +75,23 @@ def run_panel(
     system: str,
     n_runs: int,
     data_version: str,
-) -> list[RunRecord]:
-    return [
-        call_once(client, system, inp, run, data_version)
-        for client in clients
-        for inp in inputs
-        for run in range(n_runs)
-    ]
+    done: set[tuple[str, str, str, int]] | None = None,
+    sink=None,
+) -> int:
+    """패널 전체를 호출한다. 새로 호출한 횟수를 돌려준다.
+
+    done에 있는 (모델, 뉴스, 변형, 반복)은 건너뛴다. 이미 받은 응답에 돈을 두 번 쓰지 않기 위해서다.
+    sink가 있으면 호출 하나가 끝날 때마다 기록을 넘긴다. 중간에 멈춰도 그때까지의 응답이 남는다.
+    """
+    done = done or set()
+    made = 0
+    for client in clients:
+        for inp in inputs:
+            for run in range(n_runs):
+                if (client.name, inp.item_id, inp.perturbation, run) in done:
+                    continue
+                record = call_once(client, system, inp, run, data_version)
+                if sink:
+                    sink(record)
+                made += 1
+    return made

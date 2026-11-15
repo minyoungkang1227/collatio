@@ -4,7 +4,7 @@
 
 Black-box stress test for correlated errors across LLMs on Korean financial news.
 
-> 상태: 모의 모델로 전체 흐름이 돈다. 실제 모델 호출, 뉴스 데이터, 실험 결과는 아직 없다.
+> 상태: 모의 모델로 전체 흐름이 돌고, 실제 모델 여섯 개와의 연결을 확인했다. 뉴스 데이터와 실험 결과는 아직 없다.
 
 ## 방향
 
@@ -49,7 +49,7 @@ PYTHONPATH=src python -m echoguard.pipeline --mock   # 모의 모델로 전체 �
 PYTHONPATH=src python -m echoguard.check             # 실제 모델 시험 호출 (API 키 필요)
 ```
 
-API 키 준비는 [docs/setup.md](docs/setup.md).
+API 키 준비는 [docs/setup.md](docs/setup.md), 뉴스 라벨링 순서는 [docs/labeling_guide.md](docs/labeling_guide.md).
 
 모의 실행의 숫자는 실제 모델과 무관하다. 되는 것과 안 되는 것은 [docs/architecture.md](docs/architecture.md) 6장.
 

@@ -121,3 +121,53 @@ def test_dataset_rejects_news_before_the_window():
     cfg = yaml.safe_load((ROOT / "config" / "experiment.yaml").read_text(encoding="utf-8"))
     latest = max(m["released"] for m in cfg["panel"]["models"] if "released" in m)
     assert cfg["dataset"]["news_from"] > latest
+
+
+def test_interrupted_run_resumes_without_repeating_calls(tmp_path):
+    from echoguard import panel
+    from echoguard.panel import Completion
+
+    cfg = yaml.safe_load((ROOT / "config" / "experiment.yaml").read_text(encoding="utf-8"))
+    items, written, _ = make_world(seed=3, n_items=10)
+
+    class Flaky:
+        """정해진 횟수만큼 답한 뒤 잔액이 떨어진 것처럼 멈추는 모델."""
+
+        name, family = "flaky", "A"
+
+        def __init__(self, budget):
+            self.budget, self.calls = budget, 0
+
+        def complete(self, system, inp, run):
+            if self.calls >= self.budget:
+                raise RuntimeError("insufficient credit")
+            self.calls += 1
+            return Completion('{"intensity": 3, "direction": 0}', 10, 5, "flaky-0")
+
+    inputs = build_inputs(items, written)
+    total = len(inputs) * cfg["panel"]["n_runs"]
+    path = tmp_path / "runs.jsonl"
+    save = lambda r: store.save([r], path)
+
+    first = Flaky(budget=40)
+    with pytest.raises(RuntimeError):
+        panel.run_panel([first], inputs, "sys", cfg["panel"]["n_runs"], "t", sink=save)
+    assert len(store.load(path)) == 40                      # 멈추기 전까지의 응답은 남아 있다
+
+    second = Flaky(budget=10**6)
+    done = {store.key(r) for r in store.load(path)}
+    made = panel.run_panel([second], inputs, "sys", cfg["panel"]["n_runs"], "t", done=done, sink=save)
+    records = store.load(path)
+    assert made == total - 40 and second.calls == total - 40  # 이미 받은 40건은 다시 부르지 않는다
+    assert len(records) == total == len({store.key(r) for r in records})
+
+
+def test_label_file_round_trip(tmp_path):
+    """라벨 파일에 적힌 글자가 다시 읽을 때 같은 값으로 돌아오는지 (방향의 -1/0/1, 출처 확인 0/1)."""
+    header = (ROOT / "data" / "labels" / "news_labels.csv").read_text(encoding="utf-8").splitlines()[0]
+    row = "n001,2026-10-21,stock,전자공시,https://example.com,제목,요약,3,-1,,clear,근거,0,1,4,,tester"
+    path = tmp_path / "labels.csv"
+    path.write_text(header + "\n" + row + "\n", encoding="utf-8")
+    (item,) = load_labels(path)
+    assert (item.direction_text, item.direction_realized, item.source_verified) == (-1, None, False)
+    assert (item.n_independent_sources, item.n_reports, item.split) == (1, 4, None)

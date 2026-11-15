@@ -110,27 +110,51 @@ def analyze(records, items: list[NewsItem], clients: list[ModelClient], cfg: dic
 
 
 def run(items, written, clients, cfg: dict, runs_path: Path) -> dict:
+    """호출하고, 저장하고, 저장한 것을 다시 읽어 분석한다.
+
+    runs_path에 이미 기록이 있으면 그만큼은 건너뛰고 이어서 한다.
+    호출 도중 오류(잔액 부족, 하루 한도 등)가 나면 그때까지의 기록은 파일에 남는다.
+    """
     items = assign_split(items, cfg["dataset"]["n_tune"], cfg["seed"])
     inputs = build_inputs(items, written, cfg["guard"]["fake_reports"])
     system = (ROOT / "prompts" / "institutional_system.txt").read_text(encoding="utf-8")
-    records = run_panel(clients, inputs, system, cfg["panel"]["n_runs"], cfg["data_version"])
-    store.save(records, runs_path)
-    return analyze(store.load(runs_path), items, clients, cfg)  # 저장한 것을 다시 읽어 계산한다
+    done = {store.key(r) for r in store.load(runs_path)} if Path(runs_path).exists() else set()
+    run_panel(
+        clients, inputs, system, cfg["panel"]["n_runs"], cfg["data_version"],
+        done=done, sink=lambda record: store.save([record], runs_path),
+    )
+    return analyze(store.load(runs_path), items, clients, cfg)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--mock", action="store_true", help="모의 모델로 전체 흐름을 돌린다")
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--mock", action="store_true", help="모의 모델로 전체 흐름을 돌린다")
+    mode.add_argument("--run", action="store_true", help="라벨 파일의 뉴스로 실제 모델을 호출한다 (API 키와 비용 필요)")
     args = parser.parse_args()
-    if not args.mock:
-        parser.error("실제 모델 클라이언트는 아직 없습니다. --mock으로 실행하세요.")
-    from .mock import make_world
-
     cfg = yaml.safe_load((ROOT / "config" / "experiment.yaml").read_text(encoding="utf-8"))
-    items, written, clients = make_world(seed=cfg["seed"])
-    with tempfile.TemporaryDirectory() as tmp:
-        report = run(items, written, clients, cfg, Path(tmp) / "runs.jsonl")
-    print("※ 모의 데이터입니다. 아래 숫자는 실제 모델과 무관합니다.")
+
+    if args.mock:
+        from .mock import make_world
+
+        items, written, clients = make_world(seed=cfg["seed"])
+        with tempfile.TemporaryDirectory() as tmp:
+            report = run(items, written, clients, cfg, Path(tmp) / "runs.jsonl")
+        print("※ 모의 데이터입니다. 아래 숫자는 실제 모델과 무관합니다.")
+    else:
+        from .clients import build_clients
+        from .dataset import load_labels, load_written
+
+        items = load_labels(ROOT / cfg["dataset"]["labels_file"])
+        if not items:
+            parser.error("라벨 파일이 비어 있습니다. docs/labeling_guide.md를 보고 뉴스를 먼저 채우세요.")
+        early = [it.item_id for it in items if it.date < cfg["dataset"]["news_from"]]
+        if early:
+            parser.error(f"기준일({cfg['dataset']['news_from']}) 이전 뉴스가 있습니다: {early[:5]}")
+        written = load_written(ROOT / "data" / "labels" / "perturbations.csv")
+        runs_path = ROOT / "data" / "runs" / cfg["data_version"] / "institutional.jsonl"
+        print(f"뉴스 {len(items)}건, 응답은 {runs_path}에 쌓입니다. 멈춰도 다시 실행하면 이어서 합니다.")
+        report = run(items, written, build_clients(cfg["panel"]["models"]), cfg, runs_path)
     print(json.dumps(report, ensure_ascii=False, indent=2))
 
 

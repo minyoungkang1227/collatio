@@ -18,6 +18,11 @@ def save(records: list[RunRecord], path: str | Path) -> None:
             f.write(r.model_dump_json() + "\n")
 
 
+def key(r: RunRecord) -> tuple[str, str, str, int]:
+    """기록 하나를 가리키는 이름. 이어서 실행할 때 이미 받은 응답인지 판단하는 데 쓴다."""
+    return (r.model, r.item_id, r.perturbation, r.run)
+
+
 def load(path: str | Path) -> list[RunRecord]:
     with open(path, encoding="utf-8") as f:
         return [RunRecord.model_validate_json(line) for line in f if line.strip()]

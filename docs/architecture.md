@@ -94,8 +94,11 @@ PYTHONPATH=src python -m echoguard.pipeline --mock
 | 지표, 순열검정, 신뢰구간, 가드 G1~G4b | 됨, 테스트 있음 |
 | 조작 입력(source_swap, fact_flip, fake_corroboration)을 포함한 가드 평가 | 됨 |
 | G4의 실제 출처 조회 | 없음. 지금은 라벨의 독립 출처 수를 그대로 쓰는 상한선 |
-| 실제 모델 클라이언트 (Anthropic, OpenAI, Google) | 작성함. **실제 API로는 아직 한 번도 돌려 보지 않았다.** `python -m echoguard.check`로 확인 필요 |
-| 뉴스 데이터 | 없음. 라벨 양식만 있음 |
+| 실제 모델 클라이언트 (Anthropic, OpenAI, Google) | 됨. 2026-11-15 시험 호출에서 여섯 모델 모두 정상 응답 ([pilot_log.md](pilot_log.md)) |
+| 뉴스 데이터 | 없음. 엑셀 양식과 변환·검사 스크립트는 있음 |
+| 호출마다 저장, 중단 후 이어서 실행 | 됨, 테스트 있음 |
+| 실제 실행 (`pipeline --run`) | 작성함. 라벨이 없어 아직 돌려 보지 않았다 |
+| 공시 후보 추출 (`scripts/sample_candidates.py`) | 작성함. **실제 전자공시 API로는 아직 돌려 보지 않았다** |
 | paraphrase·ai_style 변형 생성기 | 없음. 지금은 미리 써 둔 글을 받기만 함 |
 | 개인 트랙 | 출력 형식만 정의. 채점은 범주형이라 별도 지표가 필요 |
 | 가드 임계값을 설정용 60건에서 고르는 단계 | 없음. 지금은 설정 파일의 임시값 사용 |

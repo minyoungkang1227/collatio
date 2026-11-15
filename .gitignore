@@ -7,3 +7,8 @@ __pycache__/
 # 기사 원문과 모델 응답 원본은 올리지 않는다 (저작권·용량·API 키 노출 방지)
 data/raw/
 data/runs/
+
+# 사실을 뒤집은 글에는 실제 회사명이 들어간다. 조작된 글을 공개하지 않는다
+data/labels/perturbations.csv
+# 채우는 중인 엑셀 사본 (양식 원본 labeling_template.xlsx만 올린다)
+data/labels/*_filled.xlsx
