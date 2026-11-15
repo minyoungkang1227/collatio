@@ -19,6 +19,7 @@
 | difficulty | clear 또는 ambiguous |
 | label_basis | direction_text를 그렇게 붙인 근거 한 줄 |
 | source_verified | 공시·정부 발표처럼 1차 출처가 확인되면 1, 아니면 0 |
+| n_independent_sources | 같은 사실을 따로 확인해 준 독립 출처의 수. 공시·정부 발표, 자체 취재로 확인한 주요 매체만 센다. 받아쓴 기사, 통신사 전재, 커뮤니티 글은 세지 않는다 |
 | split | tune(설정용 60건) 또는 eval(평가용 40건). 스크립트가 채운다 |
 | labeler | 라벨을 붙인 사람 |
 

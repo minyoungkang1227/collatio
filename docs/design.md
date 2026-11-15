@@ -50,29 +50,22 @@
 
 ③의 독립 가정 기대 비율은 모델별 오답률의 곱이다. 뉴스 난이도가 섞여 있으면 독립이어도 이 값을 넘을 수 있으므로, 강도·애매함 구간별로 나눠서도 계산한다.
 
-## 6. 가드 (초안)
+## 6. 가드
 
-입력: 패널 일치도, 출처 검증 여부(`source_verified`).
+오류를 둘로 나눈다. 글을 함께 잘못 읽는 **오독**, 조작된 글을 함께 믿는 **오신**. 가드는 둘 다 잡아야 한다.
 
-| 일치도 | 출처 | 판정 |
-|---|---|---|
-| 낮음 | 무관 | 검토 (모델들이 갈림) |
-| 높음 | 검증됨 | 통과 |
-| 높음 | 미검증 | 검토 (함께 속았을 수 있음) |
+| 가드 | 보는 것 |
+|---|---|
+| G1 | 패널 일치도 |
+| G2 | 일치도 + 글에 붙은 출처 표기 |
+| G3 | 일치도 + 문체를 바꿔 다시 물었을 때의 안정성 |
+| G4 | 일치도 + 같은 사실을 확인해 준 독립 출처의 수 |
 
-임계값은 실험 결과로 정한다. 가드의 성능은 `fact_flip`·`ai_style` 변형을 얼마나 잡는지와 원본을 얼마나 잘못 잡는지로 평가한다.
+G2는 글이 스스로 말하는 출처를 믿고, G4는 믿지 않는다. 정의와 평가 방법은 [experiment_spec.md](experiment_spec.md) 8장.
 
 ## 7. 근거 문헌
 
-- Financial Stability Board (2025), AI 관련 금융안정 취약성 모니터링 보고서
-- 금융위원회 (2026-06-18), 금융분야 인공지능 가이드라인 개정
-- "Why Better Models Can Create Riskier Systems", arXiv:2609.04373
-- "Financial Stability Implications of Generative AI: Taming the Animal Spirits", arXiv:2510.01451
-- Cheng, Hu, Li (2026), "When Machines Disagree: Evidence from Large Language Models"
-- Wang & Wang, "Assessing Consistency and Reproducibility in the Outputs of LLMs", arXiv:2503.16974
-- Ng et al. (2026), "Market reactions to deceptive language in fake news", ACM TMIS
-
-읽고 정리한 것은 초록 수준이다. 본문을 읽으며 이 목록과 2장을 고친다.
+[related_work.md](related_work.md)에 선행연구와 이 프로젝트의 자리를 정리했다.
 
 가설, 표본 설계, 검정 방법, 가드 평가는 [experiment_spec.md](experiment_spec.md)에 고정했다.
 
