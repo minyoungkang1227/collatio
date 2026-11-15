@@ -4,7 +4,7 @@
 
 Black-box stress test for correlated errors across LLMs on Korean financial news.
 
-> 상태: 모의 모델로 전체 흐름이 돌고, 실제 모델 여섯 개와의 연결을 확인했다. 뉴스 데이터와 실험 결과는 아직 없다.
+> 상태 (2026-11-16): 모의 모델로 전체 흐름이 돈다. 실제 공시 10건으로 시범 실행을 하는 중이다(1,080회 호출 중 720회 완료). 뉴스 100건의 본 실행과 그 결과는 아직 없다.
 
 ## 방향
 
