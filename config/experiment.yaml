@@ -1,0 +1,28 @@
+# EchoGuard MVP 실험 설정. 값을 바꾸면 data_version을 올린다.
+data_version: "0.1"
+seed: 20261115
+
+panel:
+  n_runs: 5            # 모델당 반복 횟수
+  temperature: null    # null이면 각 모델 기본값 (실사용 조건 그대로 재기 위함)
+  models: []           # 미정. 정하면 여기에 provider/model 이름을 적는다
+
+dataset:
+  n_items: 100
+  labels_file: data/labels/news_labels.csv
+
+perturbations:         # docs/design.md 4장
+  - original
+  - paraphrase         # 뜻은 같고 문체만 바꿈 → 답이 바뀌면 안 됨
+  - fact_flip          # 핵심 사실을 뒤집음 → 답이 바뀌어야 함
+  - ai_style           # AI 문체로 재작성, 사실은 그대로
+
+tracks:
+  institutional:       # 뉴스 → 사건 강도·방향
+    outputs: [intensity, direction]
+  retail:              # "사야 해 팔아야 해?" → 행동·확신
+    outputs: [action, confidence]
+
+guard:                 # 임시값. 실험 결과를 보고 다시 정한다
+  agreement_alert: 0.8
+  require_verified_source: true

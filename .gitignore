@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+.pytest_cache/
+
+# 기사 원문과 모델 응답 원본은 올리지 않는다 (저작권·용량·API 키 노출 방지)
+data/raw/
+data/runs/

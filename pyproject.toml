@@ -1,0 +1,9 @@
+[project]
+name = "echoguard"
+version = "0.1.0"
+description = "Black-box stress test for correlated errors across LLMs on Korean financial news"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
