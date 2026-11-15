@@ -68,3 +68,18 @@ def test_guard_hand_values():
     assert guard.evaluate(g1, answers, truth)["recall"] == 0.0
     g2 = guard.g2_agreement_source(answers, 0.8, np.array([True, False, True]))
     assert guard.evaluate(g2, answers, truth)["recall"] == 1.0
+
+
+def test_g4_ignores_the_tag_and_checks_corroboration():
+    answers = np.array([[1, -1], [1, -1], [1, -1]])        # 두 뉴스 모두 전원 일치
+    truth = np.array([1, 1])                                # 뉴스 1은 일치한 오답
+    g4 = guard.g4_corroboration(answers, 0.8, np.array([3, 0]))
+    assert g4.tolist() == [False, True]
+    assert guard.evaluate(g4, answers, truth) == {"recall": 1.0, "precision": 1.0, "review_rate": 0.5, "n_wrong": 1}
+
+
+def test_tag_based_guard_misses_fabricated_news_with_a_trusted_tag(report):
+    pooled = report["H4_guard_eval_with_manipulated_inputs"]
+    # 사실을 뒤집은 글에 믿을 만한 표기가 붙어 있으면 G2는 통과시키고, G4는 잡는다
+    assert pooled["G4_corroboration"]["recall"] > pooled["G2_agreement_source_tag"]["recall"]
+    assert pooled["G4_corroboration"]["recall"] > pooled["G1_agreement"]["recall"]

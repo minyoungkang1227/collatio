@@ -22,6 +22,7 @@ class NewsItem(BaseModel):
     difficulty: Literal["clear", "ambiguous"]
     label_basis: str = Field(min_length=1)
     source_verified: bool
+    n_independent_sources: int = Field(ge=0)  # 같은 사실을 따로 확인해 준 1차 출처·주요 매체 수
     split: Literal["tune", "eval"] | None = None
     labeler: str
 

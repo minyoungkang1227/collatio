@@ -56,16 +56,43 @@ def analyze(records, items: list[NewsItem], clients: list[ModelClient], cfg: dic
         "H3_co_flip": {k: metrics.co_flip(original, arr(k)) for k in ("paraphrase", "ai_style", "source_swap")},
     }
 
-    # 가드는 평가용 뉴스에서만 채점한다
+    # 가드는 평가용 뉴스에서만 채점한다.
+    # 정답은 '실제 사실'의 방향이다. 사실을 뒤집은 글(fact_flip)을 모델이 충실히 읽으면
+    # 글에 대해서는 맞지만 실제 사실과는 어긋난다. 가드가 잡아야 하는 것은 이 둘 다다.
     ev = np.array([it.split == "eval" for it in items])
+    world = truth[ev]
+    verified = np.array([it.source_verified for it in items])[ev]
+    sources = np.array([it.n_independent_sources for it in items])[ev]
+    thr = cfg["guard"]["agreement_alert"]
+
     ans = metrics.model_answers(original)[:, ev]
     probe = metrics.model_answers(arr("paraphrase"))[:, ev]
-    verified = np.array([it.source_verified for it in items])[ev]
-    thr = cfg["guard"]["agreement_alert"]
-    report["H4_guard_eval"] = {
-        "G1_agreement": guard.evaluate(guard.g1_agreement(ans, thr), ans, truth[ev]),
-        "G2_agreement_source": guard.evaluate(guard.g2_agreement_source(ans, thr, verified), ans, truth[ev]),
-        "G3_probe": guard.evaluate(guard.g3_probe(ans, probe, thr), ans, truth[ev]),
+    report["H4_guard_eval_original"] = {
+        "G1_agreement": guard.evaluate(guard.g1_agreement(ans, thr), ans, world),
+        "G2_agreement_source_tag": guard.evaluate(guard.g2_agreement_source(ans, thr, verified), ans, world),
+        "G3_probe": guard.evaluate(guard.g3_probe(ans, probe, thr), ans, world),
+        "G4_corroboration": guard.evaluate(guard.g4_corroboration(ans, thr, sources), ans, world),
+    }
+
+    # 조작된 입력까지 합친 평가: 원본 + 출처 표기만 바꾼 글 + 사실을 뒤집은 글
+    # 글에 붙은 표기와, 그 내용을 따로 확인해 준 출처 수는 입력마다 다르다.
+    kinds = {
+        "original": (verified, sources),
+        "source_swap": (~verified, sources),              # 표기만 바뀌고 내용은 사실 그대로
+        "fact_flip": (verified, np.zeros_like(sources)),  # 표기는 그대로인데 내용을 확인해 줄 곳이 없다
+    }
+    pooled_ans = np.concatenate([metrics.model_answers(arr(k))[:, ev] for k in kinds], axis=1)
+    pooled_world = np.tile(world, len(kinds))
+    pooled_tag = np.concatenate([tag for tag, _ in kinds.values()])
+    pooled_src = np.concatenate([src for _, src in kinds.values()])
+    report["H4_guard_eval_with_manipulated_inputs"] = {
+        "G1_agreement": guard.evaluate(guard.g1_agreement(pooled_ans, thr), pooled_ans, pooled_world),
+        "G2_agreement_source_tag": guard.evaluate(
+            guard.g2_agreement_source(pooled_ans, thr, pooled_tag), pooled_ans, pooled_world
+        ),
+        "G4_corroboration": guard.evaluate(
+            guard.g4_corroboration(pooled_ans, thr, pooled_src), pooled_ans, pooled_world
+        ),
     }
     return report
 

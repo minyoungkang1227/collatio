@@ -31,8 +31,9 @@ class MockClient:
 def make_world(seed: int = 0, n_items: int = 100):
     """모의 뉴스, 미리 써 둔 변형, 모의 모델 다섯 개를 만든다."""
     rng = random.Random(seed)
-    items = [
-        NewsItem(
+    def one(i: int) -> NewsItem:
+        verified = rng.random() < 0.7
+        return NewsItem(
             item_id=f"n{i:03d}",
             date="2026-11-01",
             type="stock" if i % 10 < 7 else "macro",
@@ -44,11 +45,12 @@ def make_world(seed: int = 0, n_items: int = 100):
             direction_text=rng.choice([-1, 0, 1]),
             difficulty="ambiguous" if rng.random() < 0.2 else "clear",
             label_basis="mock",
-            source_verified=rng.random() < 0.7,
+            source_verified=verified,
+            n_independent_sources=rng.randint(2, 5) if verified else rng.randint(0, 2),
             labeler="mock",
         )
-        for i in range(n_items)
-    ]
+
+    items = [one(i) for i in range(n_items)]
     written = {(it.item_id, kind): f"{it.summary} ({kind})" for it in items for kind in ("paraphrase", "ai_style", "fact_flip")}
     kinds = ("original", "source_swap", "paraphrase", "ai_style", "fact_flip")
 
