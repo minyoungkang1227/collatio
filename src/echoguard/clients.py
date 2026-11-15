@@ -15,8 +15,8 @@ ATTEMPTS = 4  # 네트워크 오류나 속도 제한에 걸렸을 때 다시 시
 
 
 class _Base:
-    def __init__(self, name: str, family: str, model_id: str):
-        self.name, self.family, self.model_id = name, family, model_id
+    def __init__(self, name: str, family: str, model_id: str, tier: str | None = None):
+        self.name, self.family, self.model_id, self.tier = name, family, model_id, tier
         self._sdk = None
 
     def complete(self, system: str, inp: PanelInput, run: int) -> Completion:
@@ -90,7 +90,7 @@ PROVIDERS = {"anthropic": AnthropicClient, "openai": OpenAIClient, "google": Goo
 
 def build_clients(models: list[dict]) -> list[_Base]:
     """설정 파일의 panel.models 목록으로 클라이언트를 만든다. 이 시점에는 네트워크를 쓰지 않는다."""
-    return [PROVIDERS[m["provider"]](m["name"], m["provider"], m["model_id"]) for m in models]
+    return [PROVIDERS[m["provider"]](m["name"], m["provider"], m["model_id"], m.get("tier")) for m in models]
 
 
 def cost_usd(model: dict, input_tokens: int, output_tokens: int) -> float:

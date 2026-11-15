@@ -58,6 +58,8 @@ def correlated_error(runs: np.ndarray, truth: np.ndarray) -> dict:
     independent_rate   각 모델이 독립이라면 기대되는 비율 (모델별 오답률의 곱)
     excess             둘의 차이. 0보다 크면 오류가 독립이 아니라 함께 움직인다
     same_wrong_rate    모든 모델이 '같은' 오답을 낸 뉴스의 비율
+    homogenization     관측값을 기대값으로 나눈 비율. 1이면 독립과 같고 1보다 크면 함께 틀린다
+                       (Bommasani 외 2022의 개인 수준 균질화 지표와 같은 정의)
     """
     answers = model_answers(runs)
     wrong = answers != truth[None, :]
@@ -69,6 +71,7 @@ def correlated_error(runs: np.ndarray, truth: np.ndarray) -> dict:
         "joint_error_rate": joint,
         "independent_rate": independent,
         "excess": joint - independent,
+        "homogenization": joint / independent if independent > 0 else float("nan"),
         "same_wrong_rate": float((all_wrong & same_answer).mean()),
     }
 
@@ -154,6 +157,8 @@ def bootstrap_ci(fn, n_items: int, n_boot: int = 2000, seed: int = 0, level: flo
     rng = np.random.default_rng(seed)
     values = np.array([fn(rng.integers(0, n_items, n_items)) for _ in range(n_boot)])
     values = values[~np.isnan(values)]
+    if len(values) == 0:  # 지표가 한 번도 정의되지 않음 (예: 틀린 판단이 없음)
+        return float("nan"), float("nan")
     lo, hi = np.quantile(values, [(1 - level) / 2, (1 + level) / 2])
     return float(lo), float(hi)
 
@@ -191,3 +196,57 @@ def wrong_answer_agreement(runs: np.ndarray, truth: np.ndarray) -> float:
             both += int(mask.sum())
             same += int((answers[a][mask] == answers[b][mask]).sum())
     return same / both if both else float("nan")
+
+
+# 방향은 -1/0/1 세 가지라 틀린 답은 두 가지다. 두 모델이 무작위로 틀린다면 같은 오답일 확률은 1/2이다.
+# Kim 외(2025)의 Helm 자료는 보기 4개(틀린 답 3개)라 기준선이 1/3이고 관측값이 0.60이었다.
+WRONG_AGREEMENT_BASELINE = 0.5
+
+
+def tier_gap(runs: np.ndarray, truth: np.ndarray, tiers: list[str | None]) -> dict:
+    """H7: 큰 모델끼리의 오답 상관 평균에서 작은 모델끼리의 평균을 뺀 값.
+
+    Ross 외(2026)는 모델 성능이 높을수록 판단 오차의 상관이 커진다고 보고했다.
+    패널이 회사마다 큰 모델 하나, 작은 모델 하나라서 두 묶음 모두 '다른 회사' 쌍만으로 이루어진다.
+    등급이 없는 모델과, 상관이 정의되지 않는 쌍(한쪽이 한 번도 안 틀림)은 뺀다.
+    """
+    wrong = error_matrix(runs, truth).astype(float)
+    pairs = {"large": [], "small": []}
+    for a in range(len(tiers)):
+        for b in range(a + 1, len(tiers)):
+            if tiers[a] != tiers[b] or tiers[a] not in pairs:
+                continue
+            if wrong[a].std() == 0 or wrong[b].std() == 0:
+                continue
+            pairs[tiers[a]].append(float(np.corrcoef(wrong[a], wrong[b])[0, 1]))
+    large = float(np.mean(pairs["large"])) if pairs["large"] else float("nan")
+    small = float(np.mean(pairs["small"])) if pairs["small"] else float("nan")
+    return {"large": large, "small": small, "gap": large - small}
+
+
+def diversification(runs: np.ndarray, truth: np.ndarray) -> dict:
+    """모델을 여러 개 써서 얻는 분산 효과가 오답 상관 때문에 얼마나 줄어드는가.
+
+    오답 지표의 분산이 sigma2로 같고 쌍별 상관이 rho로 같다고 놓으면,
+    모델 n개 평균의 분산은 sigma2 * (1 + (n-1) * rho) / n 이다. 신용 포트폴리오의 부도 상관과 같은 식이다.
+      effective_models         n / (1 + (n-1) * rho). 상관된 모델 n개가 독립인 모델 몇 개와 같은가
+      variance_floor           rho * sigma2. 모델을 아무리 늘려도 내려가지 않는 하한 (Ross 외 2026)
+      floor_share_of_single    하한 / 단일 모델 분산 = rho
+    두 가정(같은 분산, 같은 상관)은 근사다. 모델별 오답률이 크게 다르면 값이 어긋난다.
+    """
+    wrong = error_matrix(runs, truth).astype(float)
+    n = len(wrong)
+    rho = pairwise_error_correlation(runs, truth)
+    sigma2 = float(np.mean(wrong.mean(axis=1) * (1 - wrong.mean(axis=1))))
+    if np.isnan(rho):
+        nan = float("nan")
+        return {"n_models": n, "mean_error_correlation": nan, "effective_models": nan,
+                "single_model_variance": sigma2, "panel_variance": nan, "variance_floor": nan}
+    return {
+        "n_models": n,
+        "mean_error_correlation": rho,
+        "effective_models": n / (1 + (n - 1) * rho) if 1 + (n - 1) * rho > 0 else float("nan"),
+        "single_model_variance": sigma2,
+        "panel_variance": sigma2 * (1 + (n - 1) * rho) / n,
+        "variance_floor": rho * sigma2,
+    }

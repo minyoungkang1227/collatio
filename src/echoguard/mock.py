@@ -17,6 +17,7 @@ FAMILIES = {"a-large": "A", "a-small": "A", "b-large": "B", "b-small": "B", "c-o
 class MockClient:
     def __init__(self, name: str, beliefs: dict, noise: float, fail_rate: float, seed: int):
         self.name, self.family = name, FAMILIES[name]
+        self.tier = name.split("-")[1] if name.endswith(("large", "small")) else None
         self._beliefs, self._noise, self._fail, self._seed = beliefs, noise, fail_rate, seed
 
     def complete(self, system: str, inp: PanelInput, run: int) -> Completion:

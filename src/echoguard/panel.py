@@ -27,6 +27,7 @@ class Completion:
 class ModelClient(Protocol):
     name: str      # 패널 안에서의 이름
     family: str    # 개발사. 같은 회사 모델끼리 더 겹치는지(H2) 볼 때 쓴다
+    tier: str | None  # large 또는 small. 큰 모델끼리 더 겹치는지(H7) 볼 때 쓴다
 
     def complete(self, system: str, inp: PanelInput, run: int) -> Completion: ...
 

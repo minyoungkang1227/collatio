@@ -26,6 +26,7 @@ def analyze(records, items: list[NewsItem], clients: list[ModelClient], cfg: dic
     """저장된 기록에서 지표와 가드 성능을 계산한다."""
     models = [c.name for c in clients]
     families = [c.family for c in clients]
+    tiers = [getattr(c, "tier", None) for c in clients]
     ids = [it.item_id for it in items]
     n_runs = cfg["panel"]["n_runs"]
     seed = cfg["seed"]
@@ -45,6 +46,10 @@ def analyze(records, items: list[NewsItem], clients: list[ModelClient], cfg: dic
     lo, hi = metrics.bootstrap_ci(
         lambda idx: metrics.pairwise_error_correlation(original[:, idx, :], truth[idx]), len(items), seed=seed
     )
+    def gap_ci(fn, labels):  # 가족 간 격차(H2)와 등급 간 격차(H7)의 뉴스 단위 부트스트랩 구간
+        g = metrics.bootstrap_ci(lambda idx: fn(original[:, idx, :], truth[idx], labels)["gap"], len(items), seed=seed)
+        return [round(g[0], 3), round(g[1], 3)]
+
     report = {
         "n_items": len(items),
         "models": models,
@@ -57,9 +62,14 @@ def analyze(records, items: list[NewsItem], clients: list[ModelClient], cfg: dic
             "value": round(metrics.pairwise_error_correlation(original, truth), 3),
             "ci95": [round(lo, 3), round(hi, 3)],
         },
-        "wrong_answer_agreement": round(metrics.wrong_answer_agreement(original, truth), 3),
+        "diversification": metrics.diversification(original, truth),
+        "wrong_answer_agreement": {
+            "value": round(metrics.wrong_answer_agreement(original, truth), 3),
+            "random_baseline": metrics.WRONG_AGREEMENT_BASELINE,
+        },
         "H1_permutation": metrics.permutation_test(original, truth, strata, seed=seed),
-        "H2_family_gap": metrics.family_gap(original, truth, families),
+        "H2_family_gap": {**metrics.family_gap(original, truth, families), "gap_ci95": gap_ci(metrics.family_gap, families)},
+        "H7_tier_gap": {**metrics.tier_gap(original, truth, tiers), "gap_ci95": gap_ci(metrics.tier_gap, tiers)},
         "H3_co_flip": {k: metrics.co_flip(original, arr(k)) for k in ("paraphrase", "ai_style", "source_swap")},
     }
 

@@ -7,12 +7,12 @@ panel:
   temperature: null    # null이면 각 모델 기본값 (실사용 조건 그대로 재기 위함)
   # 세 회사 × 큰 모델·작은 모델. 가격은 100만 토큰당 달러(2026-11-15 조사, 결제 전 공식 페이지 재확인)
   models:
-    - {name: gpt-sol,       provider: openai,    model_id: gpt-6.1-sol,           usd_in: 2.00, usd_out: 10.00, released: "2026-09-29"}
-    - {name: gpt-luna,      provider: openai,    model_id: gpt-6-luna,            usd_in: 0.10, usd_out: 0.50,  released: "2026-09-22"}
-    - {name: claude-sonnet, provider: anthropic, model_id: claude-sonnet-5-5,     usd_in: 2.00, usd_out: 10.00, knowledge_cutoff: "2026-06"}
-    - {name: claude-haiku,  provider: anthropic, model_id: claude-haiku-5-5,      usd_in: 0.10, usd_out: 0.50,  knowledge_cutoff: "2026-06"}
-    - {name: gemini-flash,  provider: google,    model_id: gemini-3.8-flash,      usd_in: 0.75, usd_out: 3.75,  released: "2026-09-02"}
-    - {name: gemini-lite,   provider: google,    model_id: gemini-3.5-flash-lite, usd_in: 0.30, usd_out: 2.50,  released: "2026-07-21"}
+    - {name: gpt-sol,       provider: openai, tier: large,    model_id: gpt-6.1-sol,           usd_in: 2.00, usd_out: 10.00, released: "2026-09-29"}
+    - {name: gpt-luna,      provider: openai, tier: small,    model_id: gpt-6-luna,            usd_in: 0.10, usd_out: 0.50,  released: "2026-09-22"}
+    - {name: claude-sonnet, provider: anthropic, tier: large, model_id: claude-sonnet-5-5,     usd_in: 2.00, usd_out: 10.00, knowledge_cutoff: "2026-06"}
+    - {name: claude-haiku,  provider: anthropic, tier: small, model_id: claude-haiku-5-5,      usd_in: 0.10, usd_out: 0.50,  knowledge_cutoff: "2026-06"}
+    - {name: gemini-flash,  provider: google, tier: large,    model_id: gemini-3.8-flash,      usd_in: 0.75, usd_out: 3.75,  released: "2026-09-02"}
+    - {name: gemini-lite,   provider: google, tier: small,    model_id: gemini-3.5-flash-lite, usd_in: 0.30, usd_out: 2.50,  released: "2026-07-21"}
 
 dataset:
   n_items: 100

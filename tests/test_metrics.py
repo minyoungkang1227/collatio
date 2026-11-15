@@ -123,3 +123,31 @@ def test_wrong_answer_agreement_hand_value():
     runs = stack([[5, 4, 1, 3], [5, 3, 1, 1]])
     assert metrics.wrong_answer_agreement(runs, truth) == pytest.approx(0.5)
     assert np.isnan(metrics.wrong_answer_agreement(stack([[1, 1, 1, 1], [5, 1, 1, 1]]), truth))
+
+
+def test_diversification_hand_values():
+    """오답이 완전히 겹치면 모델 넷이 하나 구실, 서로 무관하면 넷 구실을 한다."""
+    truth = np.array([1, 1, 1, 1])
+    same = metrics.diversification(stack([[5, 5, 1, 1]] * 4), truth)
+    assert same["effective_models"] == pytest.approx(1.0)
+    assert same["variance_floor"] == pytest.approx(same["single_model_variance"])
+    a, b = [5, 5, 1, 1], [5, 1, 5, 1]  # 오답 지표의 상관이 0인 두 모델
+    indep = metrics.diversification(stack([a, b]), truth)
+    assert indep["mean_error_correlation"] == pytest.approx(0.0)
+    assert indep["effective_models"] == pytest.approx(2.0)
+    assert indep["panel_variance"] == pytest.approx(indep["single_model_variance"] / 2)
+
+
+def test_tier_gap_hand_value():
+    truth = np.array([1, 1, 1, 1])
+    runs = stack([[5, 5, 1, 1], [5, 5, 1, 1], [5, 1, 5, 1], [5, 1, 1, 5], [5, 5, 1, 1]])
+    out = metrics.tier_gap(runs, truth, ["large", "large", "small", "small", None])
+    assert out["large"] == pytest.approx(1.0)   # 큰 모델 둘은 같은 뉴스에서 틀린다
+    assert out["small"] == pytest.approx(0.0)
+    assert out["gap"] == pytest.approx(1.0)
+
+
+def test_homogenization_ratio():
+    truth = np.array([1, 1, 1, 1])
+    out = metrics.correlated_error(stack([[5, 5, 1, 1], [5, 5, 1, 1]]), truth)
+    assert out["homogenization"] == pytest.approx(0.5 / 0.25)
