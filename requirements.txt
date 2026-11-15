@@ -9,3 +9,4 @@ openai
 google-genai
 openpyxl
 requests
+scikit-learn

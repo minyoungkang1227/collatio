@@ -40,3 +40,4 @@ guard:                 # 임시값. 실험 결과를 보고 다시 정한다
   agreement_alert: 0.8
   k_sources: 2         # G4: 확인해 준 출처가 이 수 미만이면 검토
   fake_reports: 3      # fake_corroboration이 꾸미는 보도 건수
+  review_rate: 0.3     # G5: 점수 상위 몇 %를 검토로 넘길지. 규칙 가드와 맞춰 비교할 때 쓴다

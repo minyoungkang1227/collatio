@@ -13,7 +13,7 @@ from pathlib import Path
 import numpy as np
 import yaml
 
-from . import guard, metrics, store
+from . import guard, learned_guard, metrics, store
 from .dataset import NewsItem, assign_split
 from .panel import ModelClient, run_panel
 from .perturb import build_inputs
@@ -100,6 +100,8 @@ def analyze(records, items: list[NewsItem], clients: list[ModelClient], cfg: dic
         ),
     }
 
+    report["H6_learned_guard"] = _learned_guard(records, items, models, families, ids, n_runs, truth, cfg)
+
     # H5: 꾸며 낸 여러 건 보도만 따로 떼어 본다
     fake = per_kind["fake_corroboration"]
     report["H5_fake_corroboration_only"] = {
@@ -107,6 +109,59 @@ def analyze(records, items: list[NewsItem], clients: list[ModelClient], cfg: dic
         "G4b_count_independent": guard.evaluate(guard.g4_corroboration(fake, thr, zero, k), fake, world),
     }
     return report
+
+
+def _learned_guard(records, items, models, families, ids, n_runs, truth, cfg) -> dict:
+    """학습하는 가드. 설정용 뉴스로 맞추고 평가용 뉴스로 채점한다."""
+    k, fake_n, rate = cfg["guard"]["k_sources"], cfg["guard"]["fake_reports"], cfg["guard"]["review_rate"]
+    verified = np.array([it.source_verified for it in items])
+    reports = np.array([it.n_reports for it in items])
+    independent = np.array([it.n_independent_sources for it in items])
+    zero, one = np.zeros_like(independent), np.ones_like(reports)
+    kinds = {  # 입력 종류: (출처 표기, 겉으로 보이는 글 수, 독립 출처 수, 조작된 글인가)
+        "original": (verified, reports, independent, False),
+        "source_swap": (~verified, reports, independent, False),
+        "fact_flip": (verified, one, zero, True),
+        "fake_corroboration": (verified, one * fake_n, zero, True),
+    }
+    Xb, Xs, y, fabricated, group, tune = [], [], [], [], [], []
+    for name, (tag, shown, indep, fake) in kinds.items():
+        direction = store.to_array(records, "direction", name, models, ids, n_runs)
+        intensity = store.to_array(records, "intensity", name, models, ids, n_runs)
+        Xb.append(learned_guard.behavior_features(direction, intensity, families))
+        Xs.append(learned_guard.source_features(tag, shown, indep, k))
+        y.append(guard.majority(metrics.model_answers(direction))[0] != truth)
+        fabricated.append(np.full(len(items), fake))
+        group.append(np.arange(len(items)))
+        tune.append(np.array([it.split == "tune" for it in items]))
+    Xb, Xs, y, fabricated, group, tune = (np.concatenate(v) for v in (Xb, Xs, y, fabricated, group, tune))
+    y = y.astype(int)
+    variants = {
+        "G5a_behavior_only": (Xb, learned_guard.BEHAVIOR),
+        "G5b_behavior_and_source": (np.hstack([Xb, Xs]), learned_guard.BEHAVIOR + learned_guard.SOURCE),
+    }
+    out = {"review_rate": rate, "n_tune_rows": int(tune.sum()), "n_tune_wrong": int(y[tune].sum())}
+    for name, (X, names) in variants.items():
+        model = learned_guard.fit(X[tune], y[tune])
+        if model is None:
+            out[name] = "설정용 자료에 틀린 판단이 없거나 전부 틀려서 학습할 수 없음"
+            continue
+        ev = ~tune
+        score = model.predict_proba(X[ev])[:, 1]
+        genuine = ev & ~fabricated
+        out[name] = {
+            "coefficients": learned_guard.coefficients(model, names),
+            "cv_auc_tune": learned_guard.grouped_cv_auc(X[tune], y[tune], group[tune]),
+            "eval_all_inputs": learned_guard.evaluate(model, X[ev], y[ev], rate),
+            # 오독: 사실인 글만 놓고, 패널이 잘못 읽은 것을 가려내는가
+            "eval_misreading_auc": learned_guard._auc(y[genuine], model.predict_proba(X[genuine])[:, 1]),
+            # 오신: 점수만 보고 조작된 글을 사실인 글과 구분하는가
+            "eval_fabrication_auc": learned_guard._auc(fabricated[ev].astype(int), score),
+            "eval_fabrication_auc_ci95": learned_guard.auc_ci(
+                fabricated[ev].astype(int), score, group[ev], seed=cfg["seed"]
+            ),
+        }
+    return out
 
 
 def run(items, written, clients, cfg: dict, runs_path: Path) -> dict:

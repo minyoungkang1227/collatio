@@ -35,10 +35,10 @@ EchoGuard는 모델 내부를 보지 않는다. 같은 뉴스를 여러 모델�
         ③ 상관 오류: 일치했는데 틀린 비율
         ④ 동반 뒤집힘: 변형 시 같은 방향으로 바뀐 비율
    → 환산: 모델별 출력이 만드는 ES 차이
-   → 가드: 일치도 / 출처 표기 / 변형 탐침 / 독립 출처 대조 → 통과·검토
+   → 가드: 일치도 / 출처 표기 / 변형 탐침 / 독립 출처 대조 / 학습 가드 → 통과·검토
 ```
 
-코드 구조는 [docs/architecture.md](docs/architecture.md), 연구 설계는 [docs/design.md](docs/design.md), 선행연구와의 차이는 [docs/related_work.md](docs/related_work.md), 가설과 분석 방법은 [docs/experiment_spec.md](docs/experiment_spec.md), 라벨 기준은 [docs/labeling_guide.md](docs/labeling_guide.md).
+코드 구조는 [docs/architecture.md](docs/architecture.md), 연구 설계는 [docs/design.md](docs/design.md), 학습하는 가드는 [docs/learned_guard.md](docs/learned_guard.md), 선행연구와의 차이는 [docs/related_work.md](docs/related_work.md), 가설과 분석 방법은 [docs/experiment_spec.md](docs/experiment_spec.md), 라벨 기준은 [docs/labeling_guide.md](docs/labeling_guide.md).
 
 ## 실행
 
