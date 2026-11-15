@@ -17,13 +17,13 @@ EchoGuard는 모델 내부를 보지 않는다. 같은 뉴스를 여러 모델�
 | 트랙 | 상황 | 모델에 묻는 것 |
 |---|---|---|
 | 기관 | 금융사가 뉴스를 AI로 해석 | 사건 강도(1~5)와 방향 |
-| 개인 | 일반 투자자가 챗봇에 질문 | 매수·보유·매도와 확신(1~5) |
+| 개인 | 일반 투자자가 챗봇에 질문 | 매수·보유·매도·판단 안 함 |
 
 ## 구조
 
 ```
 한국어 금융 뉴스 (정답 라벨 수기 작성)
-   → 변형기: 원본 / 문체만 바꿈 / 사실 뒤집음 / AI 문체
+   → 변형기: 원본 / 문체만 바꿈 / 사실 뒤집음 / AI 문체 / 출처 표기 바꿈
    → 모델 패널: LLM 여러 개 × 반복 호출
    → 측정 엔진 (LLM 없음)
         ① 모델 내 분산
@@ -34,11 +34,11 @@ EchoGuard는 모델 내부를 보지 않는다. 같은 뉴스를 여러 모델�
    → 가드: 일치도 높음 + 출처 미검증 → 사람 검토
 ```
 
-자세한 내용은 [docs/design.md](docs/design.md), 라벨 기준은 [docs/labeling_guide.md](docs/labeling_guide.md).
+자세한 내용은 [docs/design.md](docs/design.md), 가설과 분석 방법은 [docs/experiment_spec.md](docs/experiment_spec.md), 라벨 기준은 [docs/labeling_guide.md](docs/labeling_guide.md).
 
 ## 지금 있는 것
 
-- `src/echoguard/metrics.py` — 측정 지표 ①~④
+- `src/echoguard/metrics.py` — 측정 지표 ①~④, 순열검정, 부트스트랩 신뢰구간
 - `src/echoguard/schema.py` — 모델 입출력 형식
 - `tests/` — 손계산 값과 대조하는 테스트
 - `config/experiment.yaml` — 실험 설정

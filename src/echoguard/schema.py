@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-Perturbation = Literal["original", "paraphrase", "fact_flip", "ai_style"]
+Perturbation = Literal["original", "paraphrase", "fact_flip", "ai_style", "source_swap"]
 
 
 class InstitutionalOutput(BaseModel):
@@ -15,10 +15,9 @@ class InstitutionalOutput(BaseModel):
 
 
 class RetailOutput(BaseModel):
-    """개인 트랙: 투자 질문 → 행동과 확신."""
+    """개인 트랙: 투자 질문 → 행동. 답을 피하는 것도 하나의 행동으로 기록한다."""
 
-    action: Literal[-1, 0, 1]  # -1 매도, 0 보유, 1 매수
-    confidence: int = Field(ge=1, le=5)
+    action: Literal["sell", "hold", "buy", "abstain"]
 
 
 class RunRecord(BaseModel):
@@ -29,5 +28,7 @@ class RunRecord(BaseModel):
     model: str
     run: int
     track: Literal["institutional", "retail"]
-    output: InstitutionalOutput | RetailOutput
+    output: InstitutionalOutput | RetailOutput | None  # None은 형식 위반으로 실패한 호출
+    model_version: str
+    called_at: str
     data_version: str

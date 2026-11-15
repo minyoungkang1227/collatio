@@ -26,7 +26,7 @@
 4. **라벨은 모델 출력을 보기 전에 확정한다.**
 5. **패널 밖으로 일반화하지 않는다.**
 
-## 4. 변형 4종
+## 4. 변형
 
 | 변형 | 만드는 법 | 기대 | 깨지면 |
 |---|---|---|---|
@@ -35,7 +35,7 @@
 | fact_flip | 핵심 사실을 뒤집음 | 답이 반대로 | 내용을 안 읽는 모델 |
 | ai_style | AI 문체로 재작성, 사실 유지 | 답이 그대로 | 문체에 끌리는 모델 |
 
-`fact_flip`은 정답 라벨도 함께 뒤집어 따로 저장한다.
+`fact_flip`은 정답 라벨도 함께 뒤집어 따로 저장한다. 다섯 번째 변형 `source_swap`과 만드는 방법은 [experiment_spec.md](experiment_spec.md) 3장.
 
 ## 5. 지표
 
@@ -73,6 +73,8 @@
 - Ng et al. (2026), "Market reactions to deceptive language in fake news", ACM TMIS
 
 읽고 정리한 것은 초록 수준이다. 본문을 읽으며 이 목록과 2장을 고친다.
+
+가설, 표본 설계, 검정 방법, 가드 평가는 [experiment_spec.md](experiment_spec.md)에 고정했다.
 
 ## 8. 순서
 

@@ -64,3 +64,46 @@ def test_co_flip_hand_value():
 def test_co_flip_no_movement():
     runs = stack([[2, 3], [4, 1]])
     assert metrics.co_flip(runs, runs) == {"flip_rate": 0.0, "co_flip_rate": 0.0}
+
+
+def test_pairwise_error_correlation_extremes():
+    truth = np.array([1, 1, 1, 1])
+    same = stack([[5, 5, 1, 1], [5, 5, 1, 1]])
+    opposite = stack([[5, 5, 1, 1], [1, 1, 5, 5]])
+    assert metrics.pairwise_error_correlation(same, truth) == pytest.approx(1.0)
+    assert metrics.pairwise_error_correlation(opposite, truth) == pytest.approx(-1.0)
+
+
+def test_pairwise_error_correlation_undefined_when_a_model_never_errs():
+    truth = np.array([1, 1, 1, 1])
+    runs = stack([[1, 1, 1, 1], [5, 1, 1, 1]])
+    assert np.isnan(metrics.pairwise_error_correlation(runs, truth))
+
+
+def test_permutation_detects_shared_errors():
+    rng = np.random.default_rng(1)
+    truth = np.ones(200, dtype=int)
+    shared = rng.random(200) < 0.3                      # 세 모델이 같은 뉴스에서 틀림
+    runs = stack([np.where(shared, 5, 1)] * 3)
+    out = metrics.permutation_test(runs, truth, strata=np.zeros(200), n_perm=500)
+    assert out["observed"] > out["null_mean"]
+    assert out["p_value"] < 0.01
+
+
+def test_permutation_does_not_blame_difficulty():
+    # 어려운 구간에서는 누구나 자주 틀리지만 모델끼리는 독립인 경우 → 유의하면 안 된다
+    rng = np.random.default_rng(2)
+    truth = np.ones(400, dtype=int)
+    strata = np.repeat([0, 1], 200)
+    p_wrong = np.where(strata == 1, 0.6, 0.05)
+    runs = stack([np.where(rng.random(400) < p_wrong, 5, 1) for _ in range(4)])
+    stratified = metrics.permutation_test(runs, truth, strata, n_perm=500)
+    pooled = metrics.permutation_test(runs, truth, np.zeros(400), n_perm=500)
+    assert stratified["p_value"] > 0.05
+    assert pooled["p_value"] < 0.05     # 구간을 무시하면 난이도를 상관 오류로 착각한다
+
+
+def test_bootstrap_ci_contains_point_estimate():
+    values = np.arange(100) % 2
+    lo, hi = metrics.bootstrap_ci(lambda idx: values[idx].mean(), n_items=100, n_boot=500)
+    assert lo < 0.5 < hi

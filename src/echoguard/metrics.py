@@ -77,3 +77,69 @@ def co_flip(original: np.ndarray, perturbed: np.ndarray) -> dict:
         "flip_rate": float(moved.mean()),
         "co_flip_rate": float(dominant[any_moved].mean()) if any_moved.any() else 0.0,
     }
+
+
+def pairwise_error_correlation(runs: np.ndarray, truth: np.ndarray) -> float:
+    """③-b 모델 쌍별 오답 지표의 상관(phi)을 평균한 값.
+
+    '전원이 함께 틀림'은 뉴스 100건에서 몇 건 안 나오므로 검정력이 낮다.
+    이 값은 모든 모델 쌍을 쓰기 때문에 같은 표본에서 더 안정적이다.
+    한 번도 안 틀리거나 전부 틀린 모델은 상관이 정의되지 않아 그 쌍을 뺀다.
+    """
+    wrong = error_matrix(runs, truth).astype(float)
+    usable = wrong[wrong.std(axis=1) > 0]
+    if len(usable) < 2:
+        return float("nan")
+    corr = np.corrcoef(usable)
+    return float(corr[np.triu_indices(len(usable), k=1)].mean())
+
+
+def permutation_test(
+    runs: np.ndarray,
+    truth: np.ndarray,
+    strata: np.ndarray,
+    n_perm: int = 2000,
+    seed: int = 0,
+) -> dict:
+    """오류가 함께 움직이는 정도가 우연 수준을 넘는지 검정한다.
+
+    귀무가설: 난이도 구간(strata)이 같으면 모델들의 오류는 서로 독립이다.
+    각 모델의 오답 벡터를 구간 안에서만 따로 섞어 귀무 분포를 만든다.
+    구간 안에서만 섞기 때문에 '어려운 뉴스라서 다 같이 틀림'은 귀무 분포에도 남는다.
+    통계량은 모델 쌍별 오답 일치(둘 다 틀림)의 평균 건수다.
+    """
+    rng = np.random.default_rng(seed)
+    wrong = error_matrix(runs, truth)
+    n_models = wrong.shape[0]
+    pairs = np.triu_indices(n_models, k=1)
+
+    def stat(w: np.ndarray) -> float:
+        both = w.astype(int) @ w.astype(int).T
+        return float(both[pairs].mean())
+
+    observed = stat(wrong)
+    groups = [np.flatnonzero(strata == s) for s in np.unique(strata)]
+    null = np.empty(n_perm)
+    for i in range(n_perm):
+        shuffled = wrong.copy()
+        for m in range(n_models):
+            for idx in groups:
+                shuffled[m, idx] = wrong[m, rng.permutation(idx)]
+        null[i] = stat(shuffled)
+    return {
+        "observed": observed,
+        "null_mean": float(null.mean()),
+        "p_value": float((1 + (null >= observed).sum()) / (1 + n_perm)),
+    }
+
+
+def bootstrap_ci(fn, n_items: int, n_boot: int = 2000, seed: int = 0, level: float = 0.95) -> tuple:
+    """뉴스를 복원추출해 지표의 신뢰구간을 구한다.
+
+    fn은 뉴스 인덱스 배열을 받아 지표 값 하나를 돌려주는 함수다.
+    """
+    rng = np.random.default_rng(seed)
+    values = np.array([fn(rng.integers(0, n_items, n_items)) for _ in range(n_boot)])
+    values = values[~np.isnan(values)]
+    lo, hi = np.quantile(values, [(1 - level) / 2, (1 + level) / 2])
+    return float(lo), float(hi)

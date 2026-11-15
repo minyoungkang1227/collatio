@@ -7,15 +7,19 @@
 | 열 | 내용 |
 |---|---|
 | item_id | `n001`부터 순서대로 |
-| date | 기사 날짜 (YYYY-MM-DD) |
+| date | 기사 날짜 (YYYY-MM-DD). 패널 모델의 지식 기준일보다 뒤여야 한다 |
+| type | stock(종목) 또는 macro(거시·정책) |
 | source | 매체 또는 공시처 |
 | url | 원문 주소. 원문 본문은 리포에 올리지 않는다 |
 | title | 기사 제목 |
-| summary | 직접 쓴 2~3문장 요약. 모델에는 이 요약을 넣는다 |
+| summary | 직접 쓴 2~3문장 요약. 모델에는 이 요약을 넣는다. 수치·주체·날짜를 넣고 '호재', '충격' 같은 평가어는 쓰지 않는다 |
 | intensity_true | 사건 강도 1~5 (아래 기준표) |
-| direction_true | 해당 종목·시장에 미치는 방향: -1 부정, 0 중립, 1 긍정 |
-| label_basis | 라벨의 근거. 가능하면 사후 사실(발표 후 5거래일 초과수익률 부호 등) |
+| direction_text | 주 정답. 글에 적힌 사실만으로 판단한 방향: -1 부정, 0 중립, 1 긍정 |
+| direction_realized | 보조 정답. 공개 후 5거래일 시장조정 누적수익률의 부호, 절대값 1% 미만은 0 |
+| difficulty | clear 또는 ambiguous |
+| label_basis | direction_text를 그렇게 붙인 근거 한 줄 |
 | source_verified | 공시·정부 발표처럼 1차 출처가 확인되면 1, 아니면 0 |
+| split | tune(설정용 60건) 또는 eval(평가용 40건). 스크립트가 채운다 |
 | labeler | 라벨을 붙인 사람 |
 
 ## 강도 기준표
@@ -30,6 +34,7 @@
 
 ## 원칙
 
-- direction_true는 느낌으로 붙이지 않는다. label_basis에 근거를 남길 수 없으면 그 뉴스는 뺀다.
-- 강도와 방향이 애매한 뉴스도 일부러 20% 정도 넣는다. 모델들이 갈리는 구간을 보기 위해서다. 이 경우 label_basis에 "애매"라고 적는다.
+- direction_text는 느낌으로 붙이지 않는다. label_basis에 근거를 남길 수 없으면 그 뉴스는 뺀다.
+- direction_text를 붙일 때 주가를 보지 않는다. direction_realized는 라벨을 다 붙인 뒤 스크립트로 채운다.
+- 강도와 방향이 애매한 뉴스도 일부러 20% 정도 넣는다. 모델들이 갈리는 구간을 보기 위해서다. 이 경우 difficulty를 ambiguous로 적는다.
 - 라벨은 모델 출력을 보기 전에 확정한다. 본 뒤에 고치면 실험이 오염된다.
