@@ -63,8 +63,9 @@ def analyze(records, items: list[NewsItem], clients: list[ModelClient], cfg: dic
     ev = np.array([it.split == "eval" for it in items])
     world = truth[ev]
     verified = np.array([it.source_verified for it in items])[ev]
-    sources = np.array([it.n_independent_sources for it in items])[ev]
-    thr = cfg["guard"]["agreement_alert"]
+    independent = np.array([it.n_independent_sources for it in items])[ev]
+    reports = np.array([it.n_reports for it in items])[ev]
+    thr, k, fake_n = cfg["guard"]["agreement_alert"], cfg["guard"]["k_sources"], cfg["guard"]["fake_reports"]
 
     ans = metrics.model_answers(original)[:, ev]
     probe = metrics.model_answers(arr("paraphrase"))[:, ev]
@@ -72,35 +73,45 @@ def analyze(records, items: list[NewsItem], clients: list[ModelClient], cfg: dic
         "G1_agreement": guard.evaluate(guard.g1_agreement(ans, thr), ans, world),
         "G2_agreement_source_tag": guard.evaluate(guard.g2_agreement_source(ans, thr, verified), ans, world),
         "G3_probe": guard.evaluate(guard.g3_probe(ans, probe, thr), ans, world),
-        "G4_corroboration": guard.evaluate(guard.g4_corroboration(ans, thr, sources), ans, world),
+        "G4a_count_reports": guard.evaluate(guard.g4_corroboration(ans, thr, reports, k), ans, world),
+        "G4b_count_independent": guard.evaluate(guard.g4_corroboration(ans, thr, independent, k), ans, world),
     }
 
-    # 조작된 입력까지 합친 평가: 원본 + 출처 표기만 바꾼 글 + 사실을 뒤집은 글
-    # 글에 붙은 표기와, 그 내용을 따로 확인해 준 출처 수는 입력마다 다르다.
+    # 조작된 입력까지 합친 평가. 입력마다 (출처 표기, 겉으로 보이는 글 수, 독립 출처 수)가 다르다.
+    zero, one = np.zeros_like(independent), np.ones_like(reports)
     kinds = {
-        "original": (verified, sources),
-        "source_swap": (~verified, sources),              # 표기만 바뀌고 내용은 사실 그대로
-        "fact_flip": (verified, np.zeros_like(sources)),  # 표기는 그대로인데 내용을 확인해 줄 곳이 없다
+        "original": (verified, reports, independent),
+        "source_swap": (~verified, reports, independent),            # 표기만 바뀌고 내용은 사실 그대로
+        "fact_flip": (verified, one, zero),                          # 조작된 글 한 건
+        "fake_corroboration": (verified, one * fake_n, zero),        # 조작된 글을 여러 건 보도처럼 꾸밈
     }
-    pooled_ans = np.concatenate([metrics.model_answers(arr(k))[:, ev] for k in kinds], axis=1)
+    per_kind = {name: metrics.model_answers(arr(name))[:, ev] for name in kinds}
+    pooled_ans = np.concatenate(list(per_kind.values()), axis=1)
     pooled_world = np.tile(world, len(kinds))
-    pooled_tag = np.concatenate([tag for tag, _ in kinds.values()])
-    pooled_src = np.concatenate([src for _, src in kinds.values()])
+    tag, shown, indep = (np.concatenate([v[i] for v in kinds.values()]) for i in range(3))
     report["H4_guard_eval_with_manipulated_inputs"] = {
         "G1_agreement": guard.evaluate(guard.g1_agreement(pooled_ans, thr), pooled_ans, pooled_world),
         "G2_agreement_source_tag": guard.evaluate(
-            guard.g2_agreement_source(pooled_ans, thr, pooled_tag), pooled_ans, pooled_world
+            guard.g2_agreement_source(pooled_ans, thr, tag), pooled_ans, pooled_world
         ),
-        "G4_corroboration": guard.evaluate(
-            guard.g4_corroboration(pooled_ans, thr, pooled_src), pooled_ans, pooled_world
+        "G4a_count_reports": guard.evaluate(guard.g4_corroboration(pooled_ans, thr, shown, k), pooled_ans, pooled_world),
+        "G4b_count_independent": guard.evaluate(
+            guard.g4_corroboration(pooled_ans, thr, indep, k), pooled_ans, pooled_world
         ),
+    }
+
+    # H5: 꾸며 낸 여러 건 보도만 따로 떼어 본다
+    fake = per_kind["fake_corroboration"]
+    report["H5_fake_corroboration_only"] = {
+        "G4a_count_reports": guard.evaluate(guard.g4_corroboration(fake, thr, one * fake_n, k), fake, world),
+        "G4b_count_independent": guard.evaluate(guard.g4_corroboration(fake, thr, zero, k), fake, world),
     }
     return report
 
 
 def run(items, written, clients, cfg: dict, runs_path: Path) -> dict:
     items = assign_split(items, cfg["dataset"]["n_tune"], cfg["seed"])
-    inputs = build_inputs(items, written)
+    inputs = build_inputs(items, written, cfg["guard"]["fake_reports"])
     system = (ROOT / "prompts" / "institutional_system.txt").read_text(encoding="utf-8")
     records = run_panel(clients, inputs, system, cfg["panel"]["n_runs"], cfg["data_version"])
     store.save(records, runs_path)

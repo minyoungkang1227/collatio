@@ -23,6 +23,7 @@ class NewsItem(BaseModel):
     label_basis: str = Field(min_length=1)
     source_verified: bool
     n_independent_sources: int = Field(ge=0)  # 같은 사실을 따로 확인해 준 1차 출처·주요 매체 수
+    n_reports: int = Field(ge=1, le=5)  # 같은 내용을 실은 글의 수. 받아쓴 글도 센다. 5건 이상은 5
     split: Literal["tune", "eval"] | None = None
     labeler: str
 

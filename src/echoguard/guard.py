@@ -31,12 +31,15 @@ def g3_probe(answers: np.ndarray, probe_answers: np.ndarray, threshold: float) -
     return g1_agreement(answers, threshold) | (majority(answers)[0] != majority(probe_answers)[0])
 
 
-def g4_corroboration(answers: np.ndarray, threshold: float, n_independent_sources: np.ndarray, k: int = 2) -> np.ndarray:
-    """G4: G1에 더해, 같은 사실을 따로 확인해 준 출처가 k곳 미만이면 검토.
+def g4_corroboration(answers: np.ndarray, threshold: float, n_sources: np.ndarray, k: int = 2) -> np.ndarray:
+    """G4: G1에 더해, 같은 내용을 확인해 준 출처가 k곳 미만이면 검토.
 
     G2는 글에 붙은 출처 표기를 믿는다. G4는 표기를 보지 않고 내용이 다른 곳에서도 확인되는지를 본다.
+    무엇을 세느냐로 둘로 갈린다.
+      G4a: n_sources에 글의 수(n_reports)를 넣는다. 받아쓴 글도 하나로 센다.
+      G4b: n_sources에 독립 출처의 수(n_independent_sources)를 넣는다.
     """
-    return g1_agreement(answers, threshold) | (n_independent_sources < k)
+    return g1_agreement(answers, threshold) | (n_sources < k)
 
 
 def evaluate(flagged: np.ndarray, answers: np.ndarray, truth: np.ndarray) -> dict:

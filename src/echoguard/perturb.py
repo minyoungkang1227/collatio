@@ -26,9 +26,24 @@ def _tagged(item: NewsItem, verified: bool, body: str | None = None) -> str:
     return f"{VERIFIED_TAG if verified else UNVERIFIED_TAG}\n{body or item.summary}"
 
 
+FAKE_OUTLETS = ("가나경제", "다라뉴스", "마바투데이", "사아일보", "자차미디어")  # 실재하지 않는 이름
+
+
+def fake_corroboration_text(body: str, k: int) -> str:
+    """조작된 글 하나를, 서로를 인용하는 기사 k건처럼 꾸민다.
+
+    겉으로는 여러 곳이 보도한 것처럼 보이지만 뿌리는 하나다. 매체 이름은 지어낸 것만 쓴다.
+    """
+    lines = [f"[같은 내용 보도 {k}건]", f"({1}) {FAKE_OUTLETS[0]}: {body}"]
+    for i in range(1, k):
+        lines.append(f"({i + 1}) {FAKE_OUTLETS[i]}: {FAKE_OUTLETS[i - 1]} 보도에 따르면, {body}")
+    return "\n".join(lines)
+
+
 def build_inputs(
     items: list[NewsItem],
     written: dict[tuple[str, Perturbation], str] | None = None,
+    fake_reports: int = 3,
 ) -> list[PanelInput]:
     """뉴스마다 original과 source_swap을 만들고, 미리 써 둔 변형이 있으면 함께 넣는다.
 
@@ -47,4 +62,13 @@ def build_inputs(
                 inputs.append(
                     PanelInput(item_id=it.item_id, perturbation=kind, text=_tagged(it, it.source_verified, body))
                 )
+        flipped = written.get((it.item_id, "fact_flip"))
+        if flipped:  # 사실을 뒤집은 글이 있으면 그것을 여러 건 보도처럼 꾸민 입력도 만든다
+            inputs.append(
+                PanelInput(
+                    item_id=it.item_id,
+                    perturbation="fake_corroboration",
+                    text=_tagged(it, it.source_verified, fake_corroboration_text(flipped, fake_reports)),
+                )
+            )
     return inputs

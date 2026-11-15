@@ -46,13 +46,14 @@ def make_world(seed: int = 0, n_items: int = 100):
             difficulty="ambiguous" if rng.random() < 0.2 else "clear",
             label_basis="mock",
             source_verified=verified,
-            n_independent_sources=rng.randint(2, 5) if verified else rng.randint(0, 2),
+            n_independent_sources=(indep := rng.randint(2, 5) if verified else rng.randint(0, 2)),
+            n_reports=min(5, max(1, indep + rng.randint(0, 3))),
             labeler="mock",
         )
 
     items = [one(i) for i in range(n_items)]
     written = {(it.item_id, kind): f"{it.summary} ({kind})" for it in items for kind in ("paraphrase", "ai_style", "fact_flip")}
-    kinds = ("original", "source_swap", "paraphrase", "ai_style", "fact_flip")
+    kinds = ("original", "source_swap", "paraphrase", "ai_style", "fact_flip", "fake_corroboration")
 
     def wrong_of(d: int) -> int:
         return 1 if d <= 0 else -1
@@ -69,7 +70,7 @@ def make_world(seed: int = 0, n_items: int = 100):
         beliefs = {}
         for it in items:
             for kind in kinds:
-                truth = -it.direction_text if kind == "fact_flip" else it.direction_text
+                truth = -it.direction_text if kind in ("fact_flip", "fake_corroboration") else it.direction_text
                 d = truth
                 if it.item_id in shared or it.item_id in family_wrong[fam]:
                     d = wrong_of(truth)

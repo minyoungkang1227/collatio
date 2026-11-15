@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-Perturbation = Literal["original", "paraphrase", "fact_flip", "ai_style", "source_swap"]
+Perturbation = Literal["original", "paraphrase", "fact_flip", "ai_style", "source_swap", "fake_corroboration"]
 
 
 class InstitutionalOutput(BaseModel):

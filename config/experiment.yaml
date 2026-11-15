@@ -19,6 +19,7 @@ perturbations:         # docs/experiment_spec.md 3장
   - fact_flip          # 핵심 사실을 뒤집음 → 답이 바뀌어야 함
   - ai_style           # AI 문체로 재작성, 사실은 그대로
   - source_swap        # 본문은 그대로, 출처 표기만 공시↔익명 커뮤니티
+  - fake_corroboration # fact_flip 글을 서로 인용하는 여러 건 보도처럼 꾸밈 (규칙으로 생성)
 
 tracks:
   institutional:       # 뉴스 → 사건 강도·방향
@@ -29,4 +30,5 @@ tracks:
 
 guard:                 # 임시값. 실험 결과를 보고 다시 정한다
   agreement_alert: 0.8
-  require_verified_source: true
+  k_sources: 2         # G4: 확인해 준 출처가 이 수 미만이면 검토
+  fake_reports: 3      # fake_corroboration이 꾸미는 보도 건수

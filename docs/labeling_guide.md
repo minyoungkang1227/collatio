@@ -20,6 +20,7 @@
 | label_basis | direction_text를 그렇게 붙인 근거 한 줄 |
 | source_verified | 공시·정부 발표처럼 1차 출처가 확인되면 1, 아니면 0 |
 | n_independent_sources | 같은 사실을 따로 확인해 준 독립 출처의 수. 공시·정부 발표, 자체 취재로 확인한 주요 매체만 센다. 받아쓴 기사, 통신사 전재, 커뮤니티 글은 세지 않는다 |
+| n_reports | 같은 내용을 실은 글의 수. 제목이나 핵심 문장으로 검색해 센다. 받아쓴 글과 전재도 센다. 5건 이상은 5. 항상 n_independent_sources 이상이어야 한다 |
 | split | tune(설정용 60건) 또는 eval(평가용 40건). 스크립트가 채운다 |
 | labeler | 라벨을 붙인 사람 |
 

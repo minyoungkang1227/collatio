@@ -9,7 +9,7 @@ import yaml
 from echoguard import guard, pipeline, store
 from echoguard.dataset import assign_split, load_labels
 from echoguard.mock import make_world
-from echoguard.perturb import UNVERIFIED_TAG, VERIFIED_TAG, build_inputs
+from echoguard.perturb import UNVERIFIED_TAG, VERIFIED_TAG, build_inputs, fake_corroboration_text
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -81,5 +81,18 @@ def test_g4_ignores_the_tag_and_checks_corroboration():
 def test_tag_based_guard_misses_fabricated_news_with_a_trusted_tag(report):
     pooled = report["H4_guard_eval_with_manipulated_inputs"]
     # 사실을 뒤집은 글에 믿을 만한 표기가 붙어 있으면 G2는 통과시키고, G4는 잡는다
-    assert pooled["G4_corroboration"]["recall"] > pooled["G2_agreement_source_tag"]["recall"]
-    assert pooled["G4_corroboration"]["recall"] > pooled["G1_agreement"]["recall"]
+    assert pooled["G4b_count_independent"]["recall"] > pooled["G2_agreement_source_tag"]["recall"]
+    assert pooled["G4b_count_independent"]["recall"] > pooled["G1_agreement"]["recall"]
+
+
+def test_counting_reports_is_fooled_by_fabricated_corroboration(report):
+    h5 = report["H5_fake_corroboration_only"]
+    assert h5["G4b_count_independent"]["recall"] == 1.0          # 독립 출처가 0곳이므로 전부 검토로 넘긴다
+    assert h5["G4a_count_reports"]["recall"] < 0.5               # 글이 3건으로 보이므로 대부분 통과시킨다
+
+
+def test_fake_corroboration_text_cites_itself_with_invented_outlets():
+    text = fake_corroboration_text("영업이익이 30% 줄었다.", 3)
+    lines = text.split("\n")
+    assert lines[0] == "[같은 내용 보도 3건]" and len(lines) == 4
+    assert "가나경제 보도에 따르면" in lines[2] and "다라뉴스 보도에 따르면" in lines[3]
