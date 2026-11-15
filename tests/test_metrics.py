@@ -107,3 +107,11 @@ def test_bootstrap_ci_contains_point_estimate():
     values = np.arange(100) % 2
     lo, hi = metrics.bootstrap_ci(lambda idx: values[idx].mean(), n_items=100, n_boot=500)
     assert lo < 0.5 < hi
+
+
+def test_failed_calls_are_skipped_then_counted_wrong():
+    nan = np.nan
+    runs = np.array([[[1, nan, 1], [nan, nan, nan]]])   # 모델 1개, 뉴스 2건
+    assert metrics.model_answers(runs).tolist() == [[1, metrics.FAILED]]
+    assert metrics.error_matrix(runs, np.array([1, 1])).tolist() == [[False, True]]
+    assert metrics.intra_model_dispersion(runs) == pytest.approx([0.0])

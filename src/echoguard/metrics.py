@@ -7,27 +7,40 @@ import krippendorff
 import numpy as np
 
 
+FAILED = -99  # 반복이 전부 실패한 칸의 대표 답. 어떤 정답과도 같지 않으므로 오답으로 센다
+
+
 def model_answers(runs: np.ndarray) -> np.ndarray:
     """반복을 모델별 대표 답 하나로 줄인다. 모양 (모델, 뉴스).
 
     중앙값을 쓰되 짝수 반복에서 .5가 나오면 아래쪽 값으로 내린다.
+    실패한 호출(NaN)은 빼고 계산하고, 전부 실패한 칸은 FAILED로 둔다.
     """
-    return np.floor(np.median(runs, axis=2)).astype(int)
+    runs = np.asarray(runs, dtype=float)
+    all_failed = np.isnan(runs).all(axis=2)
+    filled = np.where(all_failed[:, :, None], 0.0, runs)
+    answers = np.floor(np.nanmedian(filled, axis=2)).astype(int)
+    answers[all_failed] = FAILED
+    return answers
 
 
 def intra_model_dispersion(runs: np.ndarray) -> np.ndarray:
     """① 모델 내 분산: 같은 모델이 같은 뉴스에 얼마나 흔들리는지. 모델별 평균 표준편차."""
-    return runs.std(axis=2).mean(axis=1)
+    runs = np.asarray(runs, dtype=float)
+    all_failed = np.isnan(runs).all(axis=2)
+    spread = np.nanstd(np.where(all_failed[:, :, None], 0.0, runs), axis=2)
+    return np.nanmean(np.where(all_failed, np.nan, spread), axis=1)
 
 
 def inter_model_agreement(runs: np.ndarray) -> float:
     """② 모델 간 일치도: 대표 답에 대한 순서형 Krippendorff α. 1이면 완전 일치."""
-    answers = model_answers(runs)
-    if np.unique(answers).size == 1:
+    answers = model_answers(runs).astype(float)
+    answers[answers == FAILED] = np.nan  # 실패는 결측으로 처리
+    if np.unique(answers[~np.isnan(answers)]).size <= 1:
         return 1.0  # 값이 하나뿐이면 α가 정의되지 않으므로 완전 일치로 둔다
     return float(
         krippendorff.alpha(
-            reliability_data=answers.astype(float),
+            reliability_data=answers,
             level_of_measurement="ordinal",
         )
     )
@@ -143,3 +156,21 @@ def bootstrap_ci(fn, n_items: int, n_boot: int = 2000, seed: int = 0, level: flo
     values = values[~np.isnan(values)]
     lo, hi = np.quantile(values, [(1 - level) / 2, (1 + level) / 2])
     return float(lo), float(hi)
+
+
+def family_gap(runs: np.ndarray, truth: np.ndarray, families: list[str]) -> dict:
+    """H2: 같은 개발사 모델 쌍의 오답 상관 평균에서 다른 개발사 쌍의 평균을 뺀 값.
+
+    상관이 정의되지 않는 쌍(한쪽이 한 번도 안 틀림)은 뺀다.
+    """
+    wrong = error_matrix(runs, truth).astype(float)
+    within, between = [], []
+    for a in range(len(families)):
+        for b in range(a + 1, len(families)):
+            if wrong[a].std() == 0 or wrong[b].std() == 0:
+                continue
+            r = float(np.corrcoef(wrong[a], wrong[b])[0, 1])
+            (within if families[a] == families[b] else between).append(r)
+    w = float(np.mean(within)) if within else float("nan")
+    b = float(np.mean(between)) if between else float("nan")
+    return {"within": w, "between": b, "gap": w - b}

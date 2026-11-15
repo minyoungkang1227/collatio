@@ -4,7 +4,7 @@
 
 Black-box stress test for correlated errors across LLMs on Korean financial news.
 
-> 상태: 설계와 측정 엔진만 있다. 뉴스 데이터와 실험 결과는 아직 없다.
+> 상태: 모의 모델로 전체 흐름이 돈다. 실제 모델 호출, 뉴스 데이터, 실험 결과는 아직 없다.
 
 ## 왜 만드나
 
@@ -34,20 +34,17 @@ EchoGuard는 모델 내부를 보지 않는다. 같은 뉴스를 여러 모델�
    → 가드: 일치도 높음 + 출처 미검증 → 사람 검토
 ```
 
-자세한 내용은 [docs/design.md](docs/design.md), 가설과 분석 방법은 [docs/experiment_spec.md](docs/experiment_spec.md), 라벨 기준은 [docs/labeling_guide.md](docs/labeling_guide.md).
+코드 구조는 [docs/architecture.md](docs/architecture.md), 연구 설계는 [docs/design.md](docs/design.md), 가설과 분석 방법은 [docs/experiment_spec.md](docs/experiment_spec.md), 라벨 기준은 [docs/labeling_guide.md](docs/labeling_guide.md).
 
-## 지금 있는 것
-
-- `src/echoguard/metrics.py` — 측정 지표 ①~④, 순열검정, 부트스트랩 신뢰구간
-- `src/echoguard/schema.py` — 모델 입출력 형식
-- `tests/` — 손계산 값과 대조하는 테스트
-- `config/experiment.yaml` — 실험 설정
-- `data/labels/news_labels.csv` — 라벨 양식 (비어 있음)
+## 실행
 
 ```bash
 pip install -r requirements.txt
 pytest
+PYTHONPATH=src python -m echoguard.pipeline --mock   # 모의 모델로 전체 흐름 실행
 ```
+
+모의 실행의 숫자는 실제 모델과 무관하다. 되는 것과 안 되는 것은 [docs/architecture.md](docs/architecture.md) 6장.
 
 ## 한계
 
