@@ -51,6 +51,7 @@ def analyze(records, items: list[NewsItem], clients: list[ModelClient], cfg: dic
             "value": round(metrics.pairwise_error_correlation(original, truth), 3),
             "ci95": [round(lo, 3), round(hi, 3)],
         },
+        "wrong_answer_agreement": round(metrics.wrong_answer_agreement(original, truth), 3),
         "H1_permutation": metrics.permutation_test(original, truth, strata, seed=seed),
         "H2_family_gap": metrics.family_gap(original, truth, families),
         "H3_co_flip": {k: metrics.co_flip(original, arr(k)) for k in ("paraphrase", "ai_style", "source_swap")},

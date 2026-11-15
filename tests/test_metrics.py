@@ -115,3 +115,11 @@ def test_failed_calls_are_skipped_then_counted_wrong():
     assert metrics.model_answers(runs).tolist() == [[1, metrics.FAILED]]
     assert metrics.error_matrix(runs, np.array([1, 1])).tolist() == [[False, True]]
     assert metrics.intra_model_dispersion(runs) == pytest.approx([0.0])
+
+
+def test_wrong_answer_agreement_hand_value():
+    truth = np.array([1, 1, 1, 1])
+    # 둘 다 틀린 뉴스는 0, 1 두 건. 뉴스 0은 같은 오답, 뉴스 1은 다른 오답 → 1/2
+    runs = stack([[5, 4, 1, 3], [5, 3, 1, 1]])
+    assert metrics.wrong_answer_agreement(runs, truth) == pytest.approx(0.5)
+    assert np.isnan(metrics.wrong_answer_agreement(stack([[1, 1, 1, 1], [5, 1, 1, 1]]), truth))

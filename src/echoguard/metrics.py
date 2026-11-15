@@ -174,3 +174,20 @@ def family_gap(runs: np.ndarray, truth: np.ndarray, families: list[str]) -> dict
     w = float(np.mean(within)) if within else float("nan")
     b = float(np.mean(between)) if between else float("nan")
     return {"within": w, "between": b, "gap": w - b}
+
+
+def wrong_answer_agreement(runs: np.ndarray, truth: np.ndarray) -> float:
+    """두 모델이 같은 뉴스에서 둘 다 틀렸을 때, 같은 오답을 고른 비율. 모든 모델 쌍을 합쳐 계산한다.
+
+    선행연구가 일반 벤치마크에서 보고한 값과 직접 비교하기 위한 지표다.
+    둘 다 틀린 경우가 한 번도 없으면 NaN.
+    """
+    answers = model_answers(runs)
+    wrong = answers != truth[None, :]
+    both, same = 0, 0
+    for a in range(len(answers)):
+        for b in range(a + 1, len(answers)):
+            mask = wrong[a] & wrong[b]
+            both += int(mask.sum())
+            same += int((answers[a][mask] == answers[b][mask]).sum())
+    return same / both if both else float("nan")
