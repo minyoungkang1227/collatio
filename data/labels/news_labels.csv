@@ -1,1 +1,1 @@
-item_id,date,type,source,url,title,summary,intensity_true,direction_text,direction_realized,difficulty,label_basis,source_verified,n_independent_sources,n_reports,split,labeler
+item_id,date,type,source,url,title,summary,intensity_true,direction_text,direction_realized,difficulty,label_basis,source_verified,n_independent_sources,n_reports,split,labeler,label_method,op_yoy_pct,op_turn

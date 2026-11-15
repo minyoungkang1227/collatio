@@ -26,6 +26,9 @@ class NewsItem(BaseModel):
     n_reports: int = Field(ge=1, le=5)  # 같은 내용을 실은 글의 수. 받아쓴 글도 센다. 5건 이상은 5
     split: Literal["tune", "eval"] | None = None
     labeler: str
+    label_method: Literal["rule", "manual"] = "manual"  # rule: 공시 숫자에서 계산, manual: 사람이 판단
+    op_yoy_pct: float | None = None  # 영업이익 전년 동기 대비 변동률(%). 규칙 라벨의 입력
+    op_turn: Literal["없음", "적자전환", "흑자전환", "적자지속"] | None = None
 
     @field_validator("direction_text", "direction_realized", mode="before")
     @classmethod

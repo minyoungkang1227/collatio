@@ -165,9 +165,24 @@ def test_interrupted_run_resumes_without_repeating_calls(tmp_path):
 def test_label_file_round_trip(tmp_path):
     """라벨 파일에 적힌 글자가 다시 읽을 때 같은 값으로 돌아오는지 (방향의 -1/0/1, 출처 확인 0/1)."""
     header = (ROOT / "data" / "labels" / "news_labels.csv").read_text(encoding="utf-8").splitlines()[0]
-    row = "n001,2026-10-21,stock,전자공시,https://example.com,제목,요약,3,-1,,clear,근거,0,1,4,,tester"
+    row = "n001,2026-10-21,stock,전자공시,https://example.com,제목,요약,3,-1,,clear,근거,0,1,4,,tester,rule,-18,없음"
     path = tmp_path / "labels.csv"
     path.write_text(header + "\n" + row + "\n", encoding="utf-8")
     (item,) = load_labels(path)
     assert (item.direction_text, item.direction_realized, item.source_verified) == (-1, None, False)
     assert (item.n_independent_sources, item.n_reports, item.split) == (1, 4, None)
+    assert (item.label_method, item.op_yoy_pct, item.op_turn) == ("rule", -18.0, "없음")
+
+
+def test_rule_label_follows_the_intensity_rubric():
+    from echoguard.labeling import rule_label
+
+    assert rule_label(-32, "없음") == (4, -1)
+    assert rule_label(18, None) == (3, 1)
+    assert rule_label(-6.5, None) == (2, -1)
+    assert rule_label(30, None) == (4, 1)  # 경계는 높은 쪽
+    assert rule_label(0, None) == (2, 0)
+    assert rule_label(500, "흑자전환") == (4, 1)
+    assert rule_label(None, "적자전환") == (4, -1)
+    assert rule_label(-40, "적자지속") is None  # 사람이 붙인다
+    assert rule_label(None, None) is None
