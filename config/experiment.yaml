@@ -41,3 +41,8 @@ guard:                 # 임시값. 실험 결과를 보고 다시 정한다
   k_sources: 2         # G4: 확인해 준 출처가 이 수 미만이면 검토
   fake_reports: 3      # fake_corroboration이 꾸미는 보도 건수
   review_rate: 0.3     # G5: 점수 상위 몇 %를 검토로 넘길지. 규칙 가드와 맞춰 비교할 때 쓴다
+
+impact:                # 금융 영향 계산의 가정. docs/experiment_spec.md 7장
+  period_news: 20      # 한 기간에 나오는 뉴스 건수
+  es_level: 0.975      # 기간 손익의 가장 나쁜 2.5%의 평균
+  concentrated_share: 0.6   # 쏠림 시나리오에서 한 모델을 쓰는 회사의 비율

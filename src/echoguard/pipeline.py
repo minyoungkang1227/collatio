@@ -13,7 +13,7 @@ from pathlib import Path
 import numpy as np
 import yaml
 
-from . import guard, learned_guard, metrics, store
+from . import guard, impact, learned_guard, metrics, store
 from .dataset import NewsItem, assign_split
 from .panel import ModelClient, run_panel
 from .perturb import build_inputs
@@ -115,6 +115,17 @@ def analyze(records, items: list[NewsItem], clients: list[ModelClient], cfg: dic
         "G4b_count_independent": guard.evaluate(
             guard.g4_corroboration(pooled_ans, thr, indep, k), pooled_ans, pooled_world
         ),
+    }
+
+    # 금융 영향: 원문에 대한 판단으로만 계산한다. 조작된 글은 넣지 않는다
+    ic = cfg.get("impact", {})
+    args = dict(k=ic.get("period_news", 20), level=ic.get("es_level", 0.975), share=ic.get("concentrated_share", 0.6), seed=seed)
+    answers = metrics.model_answers(original)
+    strength = metrics.model_answers(store.to_array(records, "intensity", "original", models, ids, n_runs))
+    strength = np.where(strength == metrics.FAILED, 0, strength) / 5
+    report["impact"] = {
+        "unit_position": impact.impact(answers, truth, strata, **args),
+        "intensity_weighted": impact.impact(answers, truth, strata, size=strength, **args),
     }
 
     report["H6_learned_guard"] = _learned_guard(records, items, models, families, ids, n_runs, truth, cfg, sent)
