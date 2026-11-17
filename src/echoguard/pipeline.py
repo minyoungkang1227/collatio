@@ -71,7 +71,11 @@ def analyze(records, items: list[NewsItem], clients: list[ModelClient], cfg: dic
         "H1_permutation": metrics.permutation_test(original, truth, strata, seed=seed),
         "H2_family_gap": {**metrics.family_gap(original, truth, families), "gap_ci95": gap_ci(metrics.family_gap, families)},
         "H7_tier_gap": {**metrics.tier_gap(original, truth, tiers), "gap_ci95": gap_ci(metrics.tier_gap, tiers)},
-        "H3_co_flip": {k: metrics.co_flip(original, arr(k)) for k in ("paraphrase", "ai_style", "source_swap")},
+        # 보내지 않은 변형은 계산하지 않는다. 답이 없는 것을 '답이 바뀌었다'로 세면 안 된다
+        "H3_co_flip": {
+            k: metrics.co_flip(original[:, asked(k), :], arr(k)[:, asked(k), :]) if asked(k).any() else "이 변형을 보내지 않음"
+            for k in ("paraphrase", "ai_style", "source_swap")
+        },
     }
 
     # 가드는 평가용 뉴스에서만 채점한다.
@@ -89,7 +93,9 @@ def analyze(records, items: list[NewsItem], clients: list[ModelClient], cfg: dic
     report["H4_guard_eval_original"] = {
         "G1_agreement": guard.evaluate(guard.g1_agreement(ans, thr), ans, world),
         "G2_agreement_source_tag": guard.evaluate(guard.g2_agreement_source(ans, thr, verified), ans, world),
-        "G3_probe": guard.evaluate(guard.g3_probe(ans, probe, thr), ans, world),
+        "G3_probe": guard.evaluate(guard.g3_probe(ans, probe, thr), ans, world)
+        if asked("paraphrase")[ev].all()
+        else "말 바꾸기 변형이 없는 뉴스가 있어 계산하지 않음",
         "G4a_count_reports": guard.evaluate(guard.g4_corroboration(ans, thr, reports, k), ans, world),
         "G4b_count_independent": guard.evaluate(guard.g4_corroboration(ans, thr, independent, k), ans, world),
     }

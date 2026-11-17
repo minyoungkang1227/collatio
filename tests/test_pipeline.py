@@ -204,3 +204,19 @@ def test_items_without_a_flip_are_left_out_of_manipulated_scoring(tmp_path):
     assert part["H5_fake_corroboration_only"]["n_items"] < full["H5_fake_corroboration_only"]["n_items"]
     pooled = "H4_guard_eval_with_manipulated_inputs"
     assert part[pooled]["G1_agreement"]["n_wrong"] <= full[pooled]["G1_agreement"]["n_wrong"]
+
+
+def test_perturbations_that_were_not_sent_are_not_scored(tmp_path):
+    """문체 변형을 만들지 않은 실행에서 '답이 전부 바뀌었다'고 보고하면 안 된다."""
+    import yaml
+
+    from echoguard.mock import make_world
+    from echoguard.pipeline import run
+
+    cfg = yaml.safe_load((ROOT / "config" / "experiment.yaml").read_text(encoding="utf-8"))
+    items, written, clients = make_world(seed=cfg["seed"], n_items=20)
+    only_flips = {k: v for k, v in written.items() if k[1] == "fact_flip"}
+    report = run(items, only_flips, clients, cfg, tmp_path / "r.jsonl")
+    assert isinstance(report["H3_co_flip"]["paraphrase"], str)
+    assert isinstance(report["H3_co_flip"]["source_swap"], dict)
+    assert isinstance(report["H4_guard_eval_original"]["G3_probe"], str)
