@@ -1,5 +1,8 @@
 # ShockLens 점검: 사건 해석에서 모델들이 함께 틀리는가
 
+> 선택 기능이다. EchoGuard의 본체와 실험은 ShockLens에 기대지 않는다. 2026-11-18부터 이 연동은 더 넓히지 않는다.
+
+
 2026-11-17 · EchoGuard의 측정 방법을 [ShockLens](https://github.com/minyoungkang1227/shocklens)에 적용한다. 스크립트는 `integrations/shocklens_agreement.py`이고 ShockLens 저장소는 고치지 않는다.
 
 ## 무엇을 점검하나

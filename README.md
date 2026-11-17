@@ -10,14 +10,17 @@ A filter and black-box stress test for correlated errors across LLMs on Korean f
 
 목적은 방어다. 본체는 가드이고, 측정은 가드가 실제로 잡는지 확인하는 수단이다. 답을 고치지 않는다. 걸러서 사람에게 넘긴다. 다루는 문제의 목록은 [docs/problem_register.md](docs/problem_register.md), 운영 쪽 위험은 [docs/operations.md](docs/operations.md).
 
-## 쓰는 길 두 가지
+## 쓰는 법
 
-| 입력 | 경로 | 명령 |
-|---|---|---|
-| 잠정실적 공시 (숫자) | 숫자 → 요약 → 모델 패널 → 필터 | `python -m echoguard.filter --numbers data/examples/disclosure_example.json` |
-| 정책 뉴스 (글) | 뉴스 → ShockLens 사건 해석 → 필터 | `python ..\echoguard\integrations\shocklens_screen.py --today` |
+```
+python -m echoguard.filter --mock                                              # 지어낸 답으로 판정 과정 보기
+python -m echoguard.filter --numbers data/examples/disclosure_example.json     # 공시 숫자 한 건을 실제 모델에 묻고 판정
+```
 
-필터가 보는 것: 입력의 모순(G0), 답의 일치(G1), 말을 바꿔도 같은가(G3), 출처(G4b), 근거(G6). 하나라도 걸리면 검토다. 판정과 사람의 검토 결과는 기록에 남는다. 자세한 것은 [docs/filter.md](docs/filter.md), ShockLens 연동은 [docs/shocklens_check.md](docs/shocklens_check.md).
+잠정실적 공시의 숫자를 넣으면 요약을 만들어 모델 패널에 묻고, 답을 걸러 통과 또는 검토로 판정한다.
+필터가 보는 것: 입력의 모순(G0), 답의 일치(G1), 말을 바꿔도 같은가(G3), 출처(G4b), 근거(G6). 하나라도 걸리면 검토다. 판정과 사람의 검토 결과는 기록에 남는다. 자세한 것은 [docs/filter.md](docs/filter.md).
+
+EchoGuard는 다른 프로젝트 없이 혼자 돈다. `integrations/` 폴더의 ShockLens 연동은 시험 삼아 붙여 본 선택 기능이고, 본체와 실험은 그것에 기대지 않는다.
 
 ## 왜 만드나
 
