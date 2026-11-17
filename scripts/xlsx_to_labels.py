@@ -17,10 +17,12 @@ from pydantic import ValidationError
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 from echoguard.dataset import NewsItem  # noqa: E402
+from echoguard.disclosure import Disclosure, conflicts, flipped, render, to_news_item  # noqa: E402
 from echoguard.labeling import rule_label  # noqa: E402
 
 LABELS = ROOT / "data" / "labels" / "news_labels.csv"
 WRITTEN = ROOT / "data" / "labels" / "perturbations.csv"
+NUMBERS = ROOT / "data" / "labels" / "disclosures.csv"  # 옮겨 적은 공시 숫자. 요약과 정답은 이 파일에서 다시 만들 수 있다
 CSV_COLUMNS = LABELS.read_text(encoding="utf-8").splitlines()[0].split(",")
 TARGETS = {
     "type": {"stock": 70, "macro": 30},
@@ -29,8 +31,11 @@ TARGETS = {
 }
 
 
-def read_rows(path: Path) -> list[tuple[int, dict]]:
-    ws = load_workbook(path, data_only=True)["라벨"]
+def read_rows(path: Path, sheet: str = "라벨") -> list[tuple[int, dict]]:
+    wb = load_workbook(path, data_only=True)
+    if sheet not in wb.sheetnames:
+        return []
+    ws = wb[sheet]
     header = [c.value for c in ws[1]]
     rows = []
     for n, values in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
@@ -43,10 +48,29 @@ def read_rows(path: Path) -> list[tuple[int, dict]]:
 
 def main(path: str, labeler: str = "minyoung") -> int:
     rows = read_rows(Path(path))
-    if not rows:
+    d_rows = read_rows(Path(path), "공시")
+    if not rows and not d_rows:
         print("채운 행이 없습니다.")
         return 1
     items, flips, problems, differs, skipped, checked = [], [], [], [], [], 0
+    disclosures = []
+    for n, row in d_rows:  # 공시: 숫자에서 요약, 정답, 뒤집은 글을 만든다
+        try:
+            d = Disclosure.model_validate({k: v for k, v in row.items() if v != ""})
+            item = to_news_item(d, labeler)
+        except ValidationError as e:
+            problems += [f"  공시 {n}행 {err['loc'][0]}: {err['msg']}" for err in e.errors()]
+            continue
+        except ValueError as e:
+            problems.append(f"  공시 {n}행: {e}")
+            continue
+        disclosures.append(d)
+        items.append(item)
+        f = flipped(d)
+        if f is None:
+            skipped.append(f"  {d.item_id}: 전환이거나 100% 넘는 증가라 앞뒤가 맞게 뒤집을 수 없음")
+        else:
+            flips.append((d.item_id, render(f)))
     for n, row in rows:
         data = {k: (row.get(k) or None) for k in CSV_COLUMNS}
         data["labeler"] = labeler
@@ -100,6 +124,13 @@ def main(path: str, labeler: str = "minyoung") -> int:
         w = csv.writer(f)
         w.writerow(["item_id", "perturbation", "text"])
         w.writerows((i, "fact_flip", t) for i, t in flips)
+    if disclosures:
+        fields = list(Disclosure.model_fields)
+        with open(NUMBERS, "w", encoding="utf-8", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=fields)
+            w.writeheader()
+            for d in disclosures:
+                w.writerow({k: ("" if v is None else v) for k, v in d.model_dump().items()})
 
     print(f"뉴스 {len(items)}건을 썼습니다.\n\n구성 (지금 / 100건일 때 목표)")
     for field, target in TARGETS.items():
@@ -109,6 +140,9 @@ def main(path: str, labeler: str = "minyoung") -> int:
     print("  direction_text: " + ", ".join(f"{k:+d} {direction.get(k, 0)}" for k in (-1, 0, 1)) + "  (고르게)")
     methods = Counter(it.label_method for it in items)
     print(f"  라벨 방식: 규칙 {methods.get('rule', 0)}, 직접 {methods.get('manual', 0)}")
+    if disclosures:
+        mixed = sum(bool(conflicts(d)) for d in disclosures)
+        print(f"  공시 {len(disclosures)}건 중 기준 지표와 반대 방향 숫자가 섞인 공시 {mixed}건 (모델이 틀릴 수 있는 문항)")
     if skipped:
         print(f"  뒤집기 변형에서 뺀 뉴스 {len(skipped)}건:")
         print("\n".join(skipped))

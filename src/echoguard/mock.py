@@ -9,6 +9,7 @@ import random
 
 from .dataset import NewsItem
 from .panel import Completion
+from .disclosure import PRESCRIBED, change_phrase, direction_of, figure_in_text
 from .perturb import PanelInput
 
 FAMILIES = {"a-large": "A", "a-small": "A", "b-large": "B", "b-small": "B", "c-one": "C"}
@@ -27,10 +28,13 @@ class MockClient:
         rng = random.Random(f"{self._seed}|{self.name}|{inp.item_id}|{inp.perturbation}|{run}")
         if rng.random() < self._fail:
             return "죄송하지만 투자 판단은 도와드리기 어렵습니다."  # 형식 위반
-        intensity, direction = self._beliefs[(inp.item_id, inp.perturbation)]
+        intensity, direction, metric, value = self._beliefs[(inp.item_id, inp.perturbation)]
         if rng.random() < self._noise:
-            direction = rng.choice([-1, 0, 1])
-        return json.dumps({"intensity": intensity, "direction": direction})
+            direction = rng.choice([-1, 0, 1])  # 근거는 그대로 두고 답만 흔들린다
+        return json.dumps(
+            {"intensity": intensity, "direction": direction, "basis_metric": metric, "basis_value": value},
+            ensure_ascii=False,
+        )
 
 
 def make_world(seed: int = 0, n_items: int = 100):
@@ -56,7 +60,13 @@ def make_world(seed: int = 0, n_items: int = 100):
             labeler="mock",
         )
 
-    items = [one(i) for i in range(n_items)]
+    def with_figure(it: NewsItem) -> NewsItem:
+        """종목 뉴스는 숫자에서 만든 공시처럼 기준 지표의 값을 갖게 한다. 방향 정답과 부호가 같다."""
+        if it.type != "stock":
+            return it
+        return it.model_copy(update={"label_method": "rule", "op_yoy_pct": 20.0 * it.direction_text, "op_turn": "없음"})
+
+    items = [with_figure(one(i)) for i in range(n_items)]
     written = {(it.item_id, kind): f"{it.summary} ({kind})" for it in items for kind in ("paraphrase", "ai_style", "fact_flip")}
     kinds = ("original", "source_swap", "paraphrase", "ai_style", "fact_flip", "fake_corroboration")
 
@@ -81,6 +91,14 @@ def make_world(seed: int = 0, n_items: int = 100):
                     d = wrong_of(truth)
                 if it.item_id in fragile and kind in ("paraphrase", "ai_style"):
                     d = wrong_of(d)
-                beliefs[(it.item_id, kind)] = (it.intensity_true, d)
+                # 글을 제대로 읽었으면 정해진 지표와 글의 값을 근거로 대고, 잘못 읽었으면 다른 지표를 댄다
+                fig = figure_in_text(it, kind)
+                if fig is None:
+                    basis = ("기타", "글 전체")
+                elif d == direction_of(fig):  # 글에 적힌 대로 읽었다 (뒤집힌 글이면 뒤집힌 값을 따른다)
+                    basis = (PRESCRIBED, change_phrase(fig))
+                else:
+                    basis = ("영업이익_전기대비", "12% 증가" if d > 0 else "12% 감소")
+                beliefs[(it.item_id, kind)] = (it.intensity_true, d, *basis)
         clients.append(MockClient(name, beliefs, noise=0.05, fail_rate=0.01, seed=seed))
     return items, written, clients

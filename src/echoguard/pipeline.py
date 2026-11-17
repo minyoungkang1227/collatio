@@ -90,6 +90,22 @@ def analyze(records, items: list[NewsItem], clients: list[ModelClient], cfg: dic
 
     ans = metrics.model_answers(original)[:, ev]
     probe = metrics.model_answers(arr("paraphrase"))[:, ev]
+
+    def basis(kind):  # (모델, 평가용 뉴스): 근거가 지침대로였던 반복의 비율
+        return store.basis_share(records, kind, models, items)[:, ev]
+
+    # 근거 검사 요약: 원문에서, 기준 지표의 값을 아는 뉴스만
+    all_basis = store.basis_share(records, "original", models, items)
+    known = ~np.isnan(all_basis).all(axis=0)
+    cited = {}
+    for r in records:
+        if r.perturbation == "original" and r.model in models and r.output is not None and r.output.basis_metric:
+            cited[r.output.basis_metric] = cited.get(r.output.basis_metric, 0) + 1
+    report["basis"] = {
+        "n_items_with_known_figure": int(known.sum()),
+        "share_following_the_rule": {m: round(float(np.nanmean(all_basis[i, known])), 3) if known.any() else None for i, m in enumerate(models)},
+        "metrics_cited_on_originals": dict(sorted(cited.items(), key=lambda kv: -kv[1])),
+    }
     report["H4_guard_eval_original"] = {
         "G1_agreement": guard.evaluate(guard.g1_agreement(ans, thr), ans, world),
         "G2_agreement_source_tag": guard.evaluate(guard.g2_agreement_source(ans, thr, verified), ans, world),
@@ -97,22 +113,25 @@ def analyze(records, items: list[NewsItem], clients: list[ModelClient], cfg: dic
         if asked("paraphrase")[ev].all()
         else "말 바꾸기 변형이 없는 뉴스가 있어 계산하지 않음",
         "G4a_count_reports": guard.evaluate(guard.g4_corroboration(ans, thr, reports, k), ans, world),
-        "G4b_count_independent": guard.evaluate(guard.g4_corroboration(ans, thr, independent, k), ans, world),
+        "G4b_count_independent": guard.evaluate(guard.g4_corroboration(ans, thr, independent, k, verified), ans, world),
+        "G6_basis_check": guard.evaluate(guard.g6_basis(ans, thr, basis("original")), ans, world),
     }
 
     # 조작된 입력까지 합친 평가. 입력마다 (출처 표기, 겉으로 보이는 글 수, 독립 출처 수)가 다르다.
     zero, one = np.zeros_like(independent), np.ones_like(reports)
-    kinds = {
-        "original": (verified, reports, independent),
-        "source_swap": (~verified, reports, independent),            # 표기만 바뀌고 내용은 사실 그대로
-        "fact_flip": (verified, one, zero),                          # 조작된 글 한 건
-        "fake_corroboration": (verified, one * fake_n, zero),        # 조작된 글을 여러 건 보도처럼 꾸밈
+    never = np.zeros_like(verified)
+    kinds = {  # 입력 종류: (출처 표기, 겉으로 보이는 글 수, 독립 출처 수, 1차 출처가 실제로 확인되는가)
+        "original": (verified, reports, independent, verified),
+        "source_swap": (~verified, reports, independent, verified),         # 표기만 바뀌고 내용은 사실 그대로
+        "fact_flip": (verified, one, zero, never),                          # 조작된 글 한 건
+        "fake_corroboration": (verified, one * fake_n, zero, never),        # 조작된 글을 여러 건 보도처럼 꾸밈
     }
     per_kind = {name: metrics.model_answers(arr(name))[:, ev] for name in kinds}
     keep = {name: asked(name)[ev] for name in kinds}
     pooled_ans = np.concatenate([per_kind[n][:, keep[n]] for n in kinds], axis=1)
     pooled_world = np.concatenate([world[keep[n]] for n in kinds])
-    tag, shown, indep = (np.concatenate([kinds[n][i][keep[n]] for n in kinds]) for i in range(3))
+    tag, shown, indep, primary = (np.concatenate([kinds[n][i][keep[n]] for n in kinds]) for i in range(4))
+    pooled_basis = np.concatenate([basis(n)[:, keep[n]] for n in kinds], axis=1)
     report["H4_guard_eval_with_manipulated_inputs"] = {
         "G1_agreement": guard.evaluate(guard.g1_agreement(pooled_ans, thr), pooled_ans, pooled_world),
         "G2_agreement_source_tag": guard.evaluate(
@@ -120,8 +139,9 @@ def analyze(records, items: list[NewsItem], clients: list[ModelClient], cfg: dic
         ),
         "G4a_count_reports": guard.evaluate(guard.g4_corroboration(pooled_ans, thr, shown, k), pooled_ans, pooled_world),
         "G4b_count_independent": guard.evaluate(
-            guard.g4_corroboration(pooled_ans, thr, indep, k), pooled_ans, pooled_world
+            guard.g4_corroboration(pooled_ans, thr, indep, k, primary), pooled_ans, pooled_world
         ),
+        "G6_basis_check": guard.evaluate(guard.g6_basis(pooled_ans, thr, pooled_basis), pooled_ans, pooled_world),
     }
 
     # 금융 영향: 원문에 대한 판단으로만 계산한다. 조작된 글은 넣지 않는다
@@ -143,7 +163,7 @@ def analyze(records, items: list[NewsItem], clients: list[ModelClient], cfg: dic
     report["H5_fake_corroboration_only"] = {
         "n_items": int(kf.sum()),
         "G4a_count_reports": guard.evaluate(guard.g4_corroboration(fake, thr, (one * fake_n)[kf], k), fake, fw),
-        "G4b_count_independent": guard.evaluate(guard.g4_corroboration(fake, thr, zero[kf], k), fake, fw),
+        "G4b_count_independent": guard.evaluate(guard.g4_corroboration(fake, thr, zero[kf], k, never[kf]), fake, fw),
     }
     return report
 
@@ -155,9 +175,10 @@ def _learned_guard(records, items, models, families, ids, n_runs, truth, cfg, se
     reports = np.array([it.n_reports for it in items])
     independent = np.array([it.n_independent_sources for it in items])
     zero, one = np.zeros_like(independent), np.ones_like(reports)
+    enough = np.where(verified, np.maximum(independent, k), independent)  # 1차 출처가 확인되면 출처 부족으로 보지 않는다
     kinds = {  # 입력 종류: (출처 표기, 겉으로 보이는 글 수, 독립 출처 수, 조작된 글인가)
-        "original": (verified, reports, independent, False),
-        "source_swap": (~verified, reports, independent, False),
+        "original": (verified, reports, enough, False),
+        "source_swap": (~verified, reports, enough, False),
         "fact_flip": (verified, one, zero, True),
         "fake_corroboration": (verified, one * fake_n, zero, True),
     }

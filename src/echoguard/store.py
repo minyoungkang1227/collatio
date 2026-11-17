@@ -46,3 +46,26 @@ def to_array(
         if r.output is not None:
             arr[m_index[r.model], i_index[r.item_id], r.run] = getattr(r.output, field)
     return arr
+
+
+def basis_share(records: list[RunRecord], perturbation: Perturbation, models: list[str], items: list) -> np.ndarray:
+    """(모델, 뉴스) 배열: 그 모델의 반복 중 근거가 지침대로였던 비율.
+
+    기준 지표의 값을 알 수 없는 뉴스(숫자에서 만든 공시가 아닌 것)와 답이 하나도 없는 칸은 NaN이다.
+    """
+    from .disclosure import basis_ok, figure_in_text
+
+    m_index = {m: i for i, m in enumerate(models)}
+    i_index = {it.item_id: i for i, it in enumerate(items)}
+    figures = [figure_in_text(it, perturbation) for it in items]
+    ok = np.zeros((len(models), len(items)))
+    n = np.zeros((len(models), len(items)))
+    for r in records:
+        if r.perturbation != perturbation or r.model not in m_index or r.item_id not in i_index or r.output is None:
+            continue
+        i = i_index[r.item_id]
+        if figures[i] is None:
+            continue
+        n[m_index[r.model], i] += 1
+        ok[m_index[r.model], i] += basis_ok(r.output, figures[i])
+    return np.where(n > 0, ok / np.where(n > 0, n, 1), np.nan)
