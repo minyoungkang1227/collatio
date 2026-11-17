@@ -221,6 +221,7 @@ def main() -> None:
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--mock", action="store_true", help="모의 모델로 전체 흐름을 돌린다")
     mode.add_argument("--run", action="store_true", help="라벨 파일의 뉴스로 실제 모델을 호출한다 (API 키와 비용 필요)")
+    parser.add_argument("--only", help="패널 중 일부 모델만 쓴다. 설정 파일의 name을 쉼표로 (예: gpt-sol,claude-sonnet)")
     args = parser.parse_args()
     cfg = yaml.safe_load((ROOT / "config" / "experiment.yaml").read_text(encoding="utf-8"))
 
@@ -244,7 +245,15 @@ def main() -> None:
         written = load_written(ROOT / "data" / "labels" / "perturbations.csv")
         runs_path = ROOT / "data" / "runs" / cfg["data_version"] / "institutional.jsonl"
         print(f"뉴스 {len(items)}건, 응답은 {runs_path}에 쌓입니다. 멈춰도 다시 실행하면 이어서 합니다.")
-        report = run(items, written, build_clients(cfg["panel"]["models"]), cfg, runs_path)
+        models = cfg["panel"]["models"]
+        if args.only:
+            wanted = args.only.split(",")
+            unknown = [n for n in wanted if n not in {m["name"] for m in models}]
+            if unknown:
+                parser.error(f"설정 파일에 없는 모델입니다: {unknown}")
+            models = [m for m in models if m["name"] in wanted]
+            print(f"※ 패널 일부({len(models)}개)만 씁니다. 사전에 정한 패널과 다르므로 이 결과는 탐색용입니다.")
+        report = run(items, written, build_clients(models), cfg, runs_path)
     print(json.dumps(report, ensure_ascii=False, indent=2))
 
 
