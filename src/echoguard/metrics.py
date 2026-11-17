@@ -250,3 +250,27 @@ def diversification(runs: np.ndarray, truth: np.ndarray) -> dict:
         "panel_variance": sigma2 * (1 + (n - 1) * rho) / n,
         "variance_floor": rho * sigma2,
     }
+
+
+def error_consistency(runs: np.ndarray, truth: np.ndarray) -> float:
+    """정확도를 보정한 일치도(Geirhos 외 2020의 error consistency). 모든 모델 쌍의 평균.
+
+    두 모델이 같은 뉴스에서 '둘 다 맞거나 둘 다 틀린' 비율에서, 각자의 정확도만으로 우연히 그렇게 될 비율을 뺀다.
+        kappa = (관측 일치 - 기대 일치) / (1 - 기대 일치)
+        기대 일치 = acc_a * acc_b + (1 - acc_a) * (1 - acc_b)
+    0이면 정확도가 같은 독립인 두 모델 수준이고, 1이면 틀리는 뉴스가 완전히 같다.
+    Goel 외(2025)의 CAPA는 여기에 답의 확률 분포를 더한 것이다. 우리는 확률을 받지 않으므로 이 값을 쓴다.
+    쌍별 오답 상관(phi)과 같은 것을 재지만 선행연구와 같은 단위로 비교하려고 함께 보고한다.
+    기대 일치가 1인 쌍(둘 다 한 번도 안 틀림, 또는 둘 다 전부 틀림)은 정의되지 않아 뺀다.
+    """
+    wrong = error_matrix(runs, truth)
+    acc = 1 - wrong.mean(axis=1)
+    values = []
+    for a in range(len(wrong)):
+        for b in range(a + 1, len(wrong)):
+            expected = acc[a] * acc[b] + (1 - acc[a]) * (1 - acc[b])
+            if expected >= 1:
+                continue
+            observed = float((wrong[a] == wrong[b]).mean())
+            values.append((observed - expected) / (1 - expected))
+    return float(np.mean(values)) if values else float("nan")

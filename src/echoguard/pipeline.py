@@ -62,6 +62,7 @@ def analyze(records, items: list[NewsItem], clients: list[ModelClient], cfg: dic
             "value": round(metrics.pairwise_error_correlation(original, truth), 3),
             "ci95": [round(lo, 3), round(hi, 3)],
         },
+        "error_consistency": round(metrics.error_consistency(original, truth), 3),
         "diversification": metrics.diversification(original, truth),
         "wrong_answer_agreement": {
             "value": round(metrics.wrong_answer_agreement(original, truth), 3),

@@ -151,3 +151,13 @@ def test_homogenization_ratio():
     truth = np.array([1, 1, 1, 1])
     out = metrics.correlated_error(stack([[5, 5, 1, 1], [5, 5, 1, 1]]), truth)
     assert out["homogenization"] == pytest.approx(0.5 / 0.25)
+
+
+def test_error_consistency_hand_value():
+    """뉴스 10건, A는 1~4번, B는 1~3번과 5번을 틀린다. 일치 8건, 기대 일치 0.6*0.6 + 0.4*0.4 = 0.52."""
+    truth = np.ones(10, dtype=int)
+    a = [5, 5, 5, 5, 1, 1, 1, 1, 1, 1]
+    b = [5, 5, 5, 1, 5, 1, 1, 1, 1, 1]
+    assert metrics.error_consistency(stack([a, b]), truth) == pytest.approx((0.8 - 0.52) / (1 - 0.52))
+    assert metrics.error_consistency(stack([a, a]), truth) == pytest.approx(1.0)
+    assert np.isnan(metrics.error_consistency(stack([[1] * 10, [1] * 10]), truth))  # 아무도 안 틀림

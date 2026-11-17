@@ -67,6 +67,11 @@ SoK의 참고문헌 [169]가 이 논문이다. 2026-11-16에 찾았다.
 - Bommasani, Creel, Kumar, Jurafsky, Liang (2022), "Picking on the Same Person" NeurIPS 2022, arXiv:2211.13972 [요약 도구로 읽음, 앞쪽 3분의 2]: 균질화 지표 = 모든 결정자에게 동시에 실패할 확률 ÷ 독립일 때의 기대 확률. 우리 `correlated_error`의 `homogenization`과 같은 정의다. 같은 학습 자료를 쓰면 균질화가 커졌지만, 같은 기반 모델을 쓰는 경우는 적응 방법에 따라 결과가 갈렸다(가설 부분 지지).
 - Cheng, Hu, Li (2026), "When Machines Disagree" [초록]: 6개 LLM이 같은 헤드라인에 다른 판단을 낸다.
 
+- Goel 외 (2025), "Great Models Think Alike and this Undermines AI Oversight" ICML 2025, arXiv:2502.04313 [초록]: 모델 유사도 지표 CAPA. 오답이 겹치는 정도에서 정확도 때문에 우연히 일치하는 부분을 빼고, 답의 확률 분포까지 쓴다. 성능이 오를수록 오답이 닮아 간다. AI가 AI를 채점하면 닮은 모델에 점수를 더 준다. 우리는 확률을 받지 않으므로 그 바탕이 된 error consistency(Geirhos 외 2020)를 `error_consistency`로 계산해 함께 보고한다.
+- "Wavering Oracles" arXiv:2609.11428 [검색 요약]: 과학 질문에서 모델 묶음의 오류 상관이 0.340이고 유효 모델 수가 명목 개수보다 훨씬 적다. 유효 모델 수를 쓰는 선행 사례다.
+- "Are Diversity Metrics Measuring Diversity?" arXiv:2607.20768 [검색 요약]: 다양성 지표와 앙상블 정확도의 관계는 실제 문제에서 약하고 일관되지 않다는 고전 연구(Kuncheva·Whitaker 2003)를 LLM 묶음에서 다시 점검한다. 우리 지표가 "다양하다"고 나와도 "안전하다"는 뜻은 아니다. 한계로 적는다.
+- Frimpong (2026), "Model Monoculture Risk" [초록]: 모델·시장·미들웨어 세 층의 수렴을 보는 모델 단일문화 위험 지수(MMRI). 저자 스스로 보정된 정량 지표가 아니라 감독용 개념 틀의 시제품이라고 밝힌다. 실제 측정값은 없다.
+
 증거가 엇갈린다. 그래서 질문을 "쏠리는가"가 아니라 "어떤 입력에서 함께 틀리는가"로 잡는다.
 
 위 네 편과 Kim 외의 수치는 요약 도구가 뽑은 것이다. 논문이나 기획안에 인용하기 전에 원문 표에서 직접 확인한다.
@@ -94,6 +99,15 @@ SoK의 참고문헌 [169]가 이 논문이다. 2026-11-16에 찾았다.
 - 금융위원회 (2026-06), 금융분야 인공지능 가이드라인
 - FSB (2026-10), Sound Practices for Responsible Adoption of AI
 - IMF Note 2026/005, AI and Cybersecurity in the Financial Sector
+
+### 2026-11-17 추가
+
+- FSB (2025-10), "Monitoring Adoption of Artificial Intelligence and Related Vulnerabilities in the Financial Sector" [보도자료와 요약]: 당국의 AI 모니터링은 초기 단계이고 자료 공백과 표준 분류 체계의 부재가 걸림돌이다. 중요도, 집중도, 대체 가능성에 관한 취약성을 추적할 직접 지표와 대리 지표를 제시한다. 사례 연구는 생성형 AI의 제3자 의존이다. 본문의 지표 목록을 읽고 운영 절차를 거기에 맞춘다(아직 안 읽음).
+
+### 방어 수단에 관한 연구
+
+- "Models that Miss Together: Dependence-Aware Conformal Routing for Language Models" NeurIPS 2026 [검색 요약]: 여러 모델 중에서 고를 때 보증해야 할 사건은 "고른 모델이 전부 동시에 틀리는 것"이고, 이는 묶음의 결합 성질이라 모델별 점수로는 안 된다. 우리 문제의식과 같다. 방법은 아직 확인하지 못했다.
+- "Mitigating LLM Hallucinations via Conformal Abstention" arXiv:2405.01563 [검색 요약]: 답을 보류하는 기준을 등각 예측으로 정해 오류율을 보증한다. 가드 임계값을 정하는 방법의 후보다([experiment_spec.md](experiment_spec.md) 8장).
 
 ## 5. 우리가 하지 않는 것
 
