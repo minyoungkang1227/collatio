@@ -101,7 +101,8 @@ def screen_event(per_model: dict[str, list[dict]], text: str, n_outlets: int | N
         return Verdict("검토", None, max(share, 1 - share), checks), {m: {"policy": p} for m, p in policy.items()}
     if share == 0:
         checks.append(Check("정책 사건 여부", True, False, "모든 모델이 정책 사건이 아니라고 봄. ShockLens의 범위 밖"))
-        return Verdict("범위 밖", None, 1.0, checks), {m: {"policy": False} for m in policy}
+        # 입력에 문제가 있었다면 '범위 밖'이라는 결론도 믿을 수 없다
+        return Verdict("검토" if problems else "범위 밖", None, 1.0, checks), {m: {"policy": False} for m in policy}
     checks.append(Check("정책 사건 여부", True, False, "모든 모델이 정책 사건으로 봄"))
 
     events = {m: [o["event"] for o in outs if o.get("event")] for m, outs in usable.items()}
@@ -151,6 +152,31 @@ def screen_event(per_model: dict[str, list[dict]], text: str, n_outlets: int | N
     return Verdict("검토" if flagged else "통과", None, worst, checks), {m: {k: (list(v) if isinstance(v, tuple) else v) for k, v in a.items()} for m, a in answers.items()}
 
 
+def article_of(topic: dict, heads: list[dict], tries: int = 6) -> tuple[str, str | None, str]:
+    """토픽의 기사 본문을 찾는다. (글, 본문을 가져온 주소 또는 None, 실패 사유)
+
+    Google 뉴스의 주소는 원문으로 바로 이어지지 않는 경우가 많아 뒤로 미루고, 매체 주소를 먼저 시도한다.
+    본문을 얻지 못하면 헤드라인 묶음을 돌려준다. 그 경우 모델을 부르지 않고 사람에게 넘긴다.
+    """
+    from tools.news import fetch_article
+
+    by_id = {h["id"]: h for h in heads}
+    hs = [by_id[i] for i in topic["headline_ids"] if i in by_id and by_id[i].get("url")]
+    hs.sort(key=lambda h: "news.google.com" in h["url"])
+    reasons = []
+    for h in hs[:tries]:
+        try:
+            art = fetch_article(h["url"])
+        except Exception as e:  # 주소 하나가 막혀도 다음 것을 본다
+            reasons.append(f"{type(e).__name__}")
+            continue
+        if art.get("text") and len(art["text"]) >= SHORT:
+            return f"{h['title']}.\n{art['text'][:6000]}", h["url"], ""
+        reasons.append(str(art.get("error") or f"본문 {len(art.get('text') or '')}자")[:60])
+    titles = [by_id[i]["title"] for i in topic["headline_ids"] if i in by_id][:8]
+    return "\n".join(f"{t}." for t in titles), None, "; ".join(reasons) or "주소 없음"
+
+
 def todays_news(regions: list[str], top: int, include_all: bool) -> list[dict]:
     """ShockLens의 피드에서 헤드라인을 모으고, 규칙으로 토픽을 묶어 지역마다 상위 top개를 고른다. LLM을 쓰지 않는다."""
     from agents import daily_watch
@@ -169,16 +195,16 @@ def todays_news(regions: list[str], top: int, include_all: bool) -> list[dict]:
         if not include_all:
             topics = [t for t in topics if t["policy_event"]]
         for t in topics[:top]:
-            text, meta = daily_watch.topic_text(t, heads, cfg.get("fetch_article", True))
-            picked.append({"id": f"{code}-{len(picked) + 1}", "title": t["title"], "text": text, "url": meta["url"],
-                           "n_outlets": t["n_outlets"], "source_mode": meta["mode"]})
+            text, url, why = article_of(t, heads)
+            picked.append({"id": f"{code}-{len(picked) + 1}", "title": t["title"], "text": text, "url": url,
+                           "n_outlets": t["n_outlets"], "source_mode": "article" if url else "headlines", "fetch_note": why})
         print(f"  {code}: 헤드라인 {len(heads)}건, 고른 토픽 {min(top, len(topics))}건")
     return picked
 
 
 def file_news(path: str) -> list[dict]:
     blocks = [b.strip() for b in re.split(r"(?m)^\s*---\s*$", Path(path).read_text(encoding="utf-8")) if b.strip()]
-    return [{"id": f"f{i + 1}", "title": b.splitlines()[0][:60], "text": b, "url": None, "n_outlets": None, "source_mode": "file"} for i, b in enumerate(blocks)]
+    return [{"id": f"f{i + 1}", "title": b.splitlines()[0][:60], "text": b, "url": None, "n_outlets": None, "source_mode": "file", "fetch_note": ""} for i, b in enumerate(blocks)]
 
 
 def out_path(base: Path, date: str) -> Path:
@@ -226,7 +252,8 @@ def main() -> None:
     news = todays_news(a.regions.split(","), a.top, a.all) if a.today else file_news(a.file)
     if not news:
         sys.exit("판정할 뉴스가 없습니다.")
-    print(f"뉴스 {len(news)}건 × 모델 {len(clients)}개 × {a.runs}회 = 호출 {len(news) * len(clients) * a.runs}회\n")
+    ready = sum(len(n["text"]) >= SHORT for n in news)
+    print(f"뉴스 {len(news)}건 중 본문이 있는 것 {ready}건 × 모델 {len(clients)}개 × {a.runs}회 = 호출 {ready * len(clients) * a.runs}회\n")
 
     today = dt.date.today().isoformat()
     base = ECHO / "data" / "runs" / "shocklens"
@@ -236,6 +263,14 @@ def main() -> None:
     threshold, tally = cfg["guard"]["agreement_alert"], Counter()
     with open(result_path, "w", encoding="utf-8") as f:
         for item in news:
+            if len(item["text"]) < SHORT:  # 본문이 없으면 모델을 부르지 않는다. 헤드라인만 보고 한 해석은 판정할 가치가 없다
+                why = f" 본문을 가져오지 못함: {item['fetch_note']}" if item.get("fetch_note") else ""
+                verdict = Verdict("검토", None, 0.0, [Check("G0 입력 점검", True, True, f"본문이 짧다({len(item['text'])}자). 모델을 부르지 않음.{why}")])
+                tally[verdict.decision] += 1
+                print(show(f"{item['id']} {item['title']}", verdict).replace("  패널의 답: 없음\n", ""), end="\n\n")
+                entry = audit.record(log, verdict, item_id=item["id"], text=item["text"], models={}, settings={"source": item["source_mode"]})
+                f.write(json.dumps({"id": item["id"], "title": item["title"], "url": None, "decision": "검토", "reasons": verdict.reasons, "answers": {}, "audit": entry["hash"][:12]}, ensure_ascii=False) + "\n")
+                continue
             per_model = {c.name: [event_analyst.analyze(item["text"], c, None, sev_cfg) for _ in range(a.runs)] for c in clients}
             for outs in per_model.values():  # 저장할 수 있는 모양으로
                 for o in outs:
