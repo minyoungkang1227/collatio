@@ -17,7 +17,7 @@ from pydantic import ValidationError
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 from echoguard.dataset import NewsItem  # noqa: E402
-from echoguard.disclosure import Disclosure, conflicts, flipped, injected, render, render_alt, to_news_item  # noqa: E402
+from echoguard.disclosure import Disclosure, conflicts, flipped, injected, quality, render, render_alt, to_news_item  # noqa: E402
 from echoguard.labeling import rule_label  # noqa: E402
 
 LABELS = ROOT / "data" / "labels" / "news_labels.csv"
@@ -63,6 +63,10 @@ def main(path: str, labeler: str = "minyoung") -> int:
             continue
         except ValueError as e:
             problems.append(f"  공시 {n}행: {e}")
+            continue
+        wrong = quality(d)
+        if wrong:
+            problems += [f"  공시 {n}행 ({d.corp}): {w}" for w in wrong]
             continue
         disclosures.append(d)
         items.append(item)

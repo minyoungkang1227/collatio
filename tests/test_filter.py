@@ -100,3 +100,53 @@ def test_drift_reports_changed_answers_and_versions():
 
     r = compare([rec("a", -1, "v1"), rec("b", 1, "v1")], [rec("a", -1, "v2"), rec("b", -1, "v2")])["m"]
     assert r["share_changed"] == 0.5 and r["changed_items"] == ["b"] and r["version_changed"]
+
+
+def _disclosure(**over):
+    from echoguard.disclosure import Disclosure
+
+    base = dict(item_id="d1", corp="가나전자", date="2026-10-20", period="2026년 3분기", unit="억원",
+                url="https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20261020900123",
+                revenue=8200, revenue_yoy=-4.1, revenue_qoq=6.3, op=1150, op_yoy=-32, op_qoq=18.5, net=640, net_yoy=-45.2)
+    return Disclosure(**{**base, **over})
+
+
+def test_input_check_finds_numbers_that_contradict_each_other():
+    from echoguard.disclosure import quality
+
+    assert quality(_disclosure()) == []
+    assert any("적자전환" in p for p in quality(_disclosure(op_yoy="적자전환")))          # 이익인데 적자전환
+    assert any("손실이면" in p for p in quality(_disclosure(op=-300, op_qoq="적자전환")))  # 손실인데 숫자 변동률
+    assert any("매출액보다 크다" in p for p in quality(_disclosure(op=115000)))            # 단위 혼동
+    assert any("접수일" in p for p in quality(_disclosure(date="2026-10-21")))
+    assert any("기준일" in p for p in quality(_disclosure(), news_from="2026-11-01"))
+
+
+def test_bad_input_is_stopped_before_any_model_is_called_and_every_verdict_is_logged(tmp_path):
+    from echoguard import audit
+    from echoguard.panel import Completion
+
+    calls = []
+
+    class Reader:
+        name, family, tier = "a", "x", None
+
+        def complete(self, system, inp, run):
+            calls.append(run)
+            return Completion('{"intensity":4,"direction":-1,"basis_metric":"영업이익_전년동기대비","basis_value":"32% 감소"}', model_version="v1")
+
+    log = tmp_path / "decisions.jsonl"
+    bad = screen_disclosure(_disclosure(op_yoy="적자전환"), [Reader()], "s", 2, log=log)
+    assert bad.decision == "검토" and bad.checks[0].guard == "G0 입력 점검" and calls == []
+    good = screen_disclosure(_disclosure(), [Reader()], "s", 2, primary_verified=True, log=log)
+    assert good.decision == "통과" and len(calls) == 2
+
+    s = audit.summary(log)
+    assert s["n_decisions"] == 2 and s["review_rate"] == 0.5 and s["flagged_by"] == {"G0 입력 점검": 1}
+    assert s["model_versions_seen"] == ["a: ", "a: v1"] and len(s["human_reviews"]["pending"]) == 1 and s["log_intact"]
+    audit.review(log, s["human_reviews"]["pending"][0], "minyoung", "반려", "숫자 다시 옮길 것")
+    assert audit.summary(log)["human_reviews"] == {"done": 1, "반려": 1, "pending": []}
+
+    lines = log.read_text(encoding="utf-8").splitlines()
+    log.write_text("\n".join([lines[0].replace('"검토"', '"통과"')] + lines[1:]) + "\n", encoding="utf-8")
+    assert audit.verify(log) and not audit.summary(log)["log_intact"]

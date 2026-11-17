@@ -58,6 +58,50 @@ class Disclosure(BaseModel):
         return v
 
 
+def quality(d: "Disclosure", news_from: str | None = None, today: str | None = None) -> list[str]:
+    """옮겨 적은 숫자가 서로 앞뒤가 맞는지 본다. 어긋난 곳을 사람이 읽을 문장으로 돌려준다. 비어 있으면 이상 없음.
+
+    모델에 넣기 전에 하는 입력 점검(G0)이다. 원문과 같은지는 여기서 알 수 없고, 숫자끼리의 모순과 형식만 본다.
+    """
+    found = []
+    for name, amount, change in (("영업이익", d.op, d.op_yoy), ("영업이익(전기 대비)", d.op, d.op_qoq), ("순이익", d.net, d.net_yoy)):
+        if amount >= 0 and change in ("적자전환", "적자지속"):
+            found.append(f"{name}: 금액은 이익인데 변동이 {change}이다")
+        if amount < 0 and change == "흑자전환":
+            found.append(f"{name}: 금액은 손실인데 변동이 흑자전환이다")
+        if amount < 0 and not isinstance(change, str):
+            found.append(f"{name}: 금액이 손실이면 변동은 적자전환이나 적자지속이어야 하는데 숫자({_num(change)}%)가 적혀 있다")
+        if amount > 0 and not isinstance(change, str) and change < -100:
+            found.append(f"{name}: 이익이 남았는데 100% 넘게 감소했다고 적혀 있다")
+    if d.revenue < 0:
+        found.append("매출액이 음수다")
+    for name, change in (("매출액 전년 동기 대비", d.revenue_yoy), ("매출액 전기 대비", d.revenue_qoq)):
+        if isinstance(change, str):
+            found.append(f"{name}: 매출에는 {change}이 있을 수 없다")
+    if abs(d.op) > abs(d.revenue) > 0:
+        found.append("영업이익(손실)이 매출액보다 크다. 단위나 자릿수를 확인할 것")
+    if (d.cum_op is None) != (d.cum_op_yoy is None):
+        found.append("누계 영업이익과 그 변동률 중 하나만 적혀 있다")
+    if d.cum_op is not None and "1분기" in d.period and d.cum_op != d.op:
+        found.append("1분기인데 누계 영업이익이 분기 영업이익과 다르다")
+    for name, change in (("영업이익 전년 동기 대비", d.op_yoy), ("매출액 전년 동기 대비", d.revenue_yoy), ("순이익 전년 동기 대비", d.net_yoy)):
+        if not isinstance(change, str) and abs(change) > 1000:
+            found.append(f"{name}: 변동률이 1000%를 넘는다({_num(change)}%). 자릿수를 확인할 것")
+    try:
+        y, m, day = (int(x) for x in d.date.split("-"))
+        Date(y, m, day)
+    except ValueError:
+        return found + [f"공시일 {d.date}이 날짜 형식(YYYY-MM-DD)이 아니다"]
+    if news_from and d.date < news_from:
+        found.append(f"공시일이 기준일({news_from}) 이전이다")
+    if today and d.date > today:
+        found.append("공시일이 오늘보다 뒤다")
+    number = re.search(r"rcpNo=(\d{14})", d.url)
+    if number and number.group(1)[:8] != d.date.replace("-", ""):
+        found.append(f"공시일({d.date})이 주소의 접수일({number.group(1)[:8]})과 다르다")
+    return found
+
+
 def direction_of(change: Change | None) -> int | None:
     """변동이 가리키는 방향. 적자지속은 변동률의 뜻이 모호해 방향을 정하지 않는다."""
     if change is None or change == "적자지속":

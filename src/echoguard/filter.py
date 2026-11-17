@@ -21,7 +21,8 @@ import numpy as np
 import yaml
 
 from . import guard
-from .disclosure import PRESCRIBED, Change, Disclosure, basis_ok, change_phrase, key_figure, render, render_alt
+from . import audit
+from .disclosure import PRESCRIBED, Change, Disclosure, basis_ok, change_phrase, key_figure, quality, render, render_alt
 from .panel import ModelClient, call_once
 from .perturb import VERIFIED_TAG, PanelInput
 from .schema import InstitutionalOutput
@@ -128,27 +129,48 @@ def screen(
     return Verdict("검토" if flagged else "통과", int(winner), float(share), checks)
 
 
-def ask(clients: list[ModelClient], text: str, system: str, n_runs: int, item_id: str = "live") -> dict:
-    """문서 한 건을 패널에 묻는다. screen에 넣을 모양으로 돌려준다."""
+def ask(clients: list[ModelClient], text: str, system: str, n_runs: int, item_id: str = "live", versions: dict | None = None) -> dict:
+    """문서 한 건을 패널에 묻는다. screen에 넣을 모양으로 돌려준다. versions를 주면 모델이 알려 준 버전 표기를 담는다."""
     inp = PanelInput(item_id=item_id, perturbation="original", text=text)
-    return {c.name: [call_once(c, system, inp, run, "live").output for run in range(n_runs)] for c in clients}
+    outputs = {}
+    for c in clients:
+        records = [call_once(c, system, inp, run, "live") for run in range(n_runs)]
+        outputs[c.name] = [r.output for r in records]
+        if versions is not None:
+            versions[c.name] = records[-1].model_version
+    return outputs
 
 
 def screen_disclosure(
     d: Disclosure, clients: list[ModelClient], system: str, n_runs: int,
-    *, primary_verified: bool | None = None, probe: bool = False, **kw,
+    *, primary_verified: bool | None = None, probe: bool = False,
+    news_from: str | None = None, log: str | Path | None = None, **kw,
 ) -> Verdict:
     """공시 숫자 한 건을 요약으로 만들어 패널에 묻고 판정한다.
 
     primary_verified  source.verify_dart 등으로 원문을 확인한 결과. 주지 않으면 출처는 독립 출처 수만으로 판정된다
     probe             말을 바꾼 요약으로 한 번 더 묻는다. 호출 수가 두 배가 된다
+    news_from         이 날짜 이전의 공시는 입력 점검에서 걸린다
+    log               판정 기록 파일. 주면 판정을 한 줄 덧붙인다
+
+    먼저 숫자끼리 앞뒤가 맞는지 본다(G0). 어긋나면 모델을 부르지 않고 검토로 넘긴다. 틀린 입력에 대한 답은 볼 필요가 없다.
     """
-    outputs = ask(clients, f"{VERIFIED_TAG}\n{render(d)}", system, n_runs, d.item_id)
-    again = ask(clients, f"{VERIFIED_TAG}\n{render_alt(d)}", system, n_runs, d.item_id) if probe else None
-    return screen(
-        outputs, figure=key_figure(d), probe_outputs=again,
-        primary_verified=primary_verified, n_independent=d.n_independent_sources, **kw,
-    )
+    text, versions = f"{VERIFIED_TAG}\n{render(d)}", {}
+    problems = quality(d, news_from)
+    if problems:
+        verdict = Verdict("검토", None, 0.0, [Check("G0 입력 점검", True, True, "; ".join(problems))])
+    else:
+        outputs = ask(clients, text, system, n_runs, d.item_id, versions)
+        again = ask(clients, f"{VERIFIED_TAG}\n{render_alt(d)}", system, n_runs, d.item_id) if probe else None
+        verdict = screen(
+            outputs, figure=key_figure(d), probe_outputs=again,
+            primary_verified=primary_verified, n_independent=d.n_independent_sources, **kw,
+        )
+        verdict.checks.insert(0, Check("G0 입력 점검", True, False, "숫자끼리 어긋난 곳 없음"))
+    if log:
+        settings = {**kw, "n_runs": n_runs, "probe": probe, "prompt_hash": audit.text_hash(system)[:16]}
+        audit.record(log, verdict, item_id=d.item_id, text=text, models=versions or {c.name: "" for c in clients}, settings=settings)
+    return verdict
 
 
 def show(title: str, v: Verdict) -> str:
@@ -194,6 +216,7 @@ def main() -> None:
     mode.add_argument("--numbers", help="공시 숫자가 든 JSON 파일. 실제 모델을 호출한다 (API 키와 비용 필요)")
     parser.add_argument("--only", help="패널 중 일부 모델만 쓴다. 설정 파일의 name을 쉼표로")
     parser.add_argument("--probe", action="store_true", help="말을 바꾼 요약으로 한 번 더 묻는다 (호출 수 두 배)")
+    parser.add_argument("--no-log", action="store_true", help="판정 기록을 남기지 않는다")
     parser.add_argument("--json", action="store_true", help="판정을 JSON으로 출력한다")
     args = parser.parse_args()
     if args.mock:
@@ -217,6 +240,7 @@ def main() -> None:
     v = screen_disclosure(
         d, build_clients(models), system, cfg["panel"]["n_runs"],
         primary_verified=checked.verified if checked else None, probe=args.probe,
+        news_from=cfg["dataset"]["news_from"], log=None if args.no_log else ROOT / "data" / "audit" / "decisions.jsonl",
         threshold=cfg["guard"]["agreement_alert"], k_sources=cfg["guard"]["k_sources"],
     )
     if args.json:
