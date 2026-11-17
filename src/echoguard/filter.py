@@ -12,6 +12,7 @@ pipeline은 실험이다. 정답을 알고 있는 뉴스 여러 건으로 가드
 
 import argparse
 import json
+import os
 from collections import Counter
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -20,10 +21,11 @@ import numpy as np
 import yaml
 
 from . import guard
-from .disclosure import PRESCRIBED, Change, Disclosure, basis_ok, change_phrase, key_figure, render
+from .disclosure import PRESCRIBED, Change, Disclosure, basis_ok, change_phrase, key_figure, render, render_alt
 from .panel import ModelClient, call_once
 from .perturb import VERIFIED_TAG, PanelInput
 from .schema import InstitutionalOutput
+from .source import verify_dart
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -59,6 +61,7 @@ def screen(
     outputs: dict[str, list[InstitutionalOutput | None]],
     *,
     figure: Change | None = None,
+    probe_outputs: dict[str, list[InstitutionalOutput | None]] | None = None,
     primary_verified: bool | None = None,
     n_independent: int | None = None,
     threshold: float = 0.8,
@@ -68,6 +71,7 @@ def screen(
 
     outputs           모델 이름 → 그 모델의 반복 답들. 형식이 틀려 실패한 답은 None
     figure            글에 적힌 기준 지표의 값. 알면 근거 대조(G6)를 한다
+    probe_outputs     같은 내용을 말만 바꿔 다시 물은 답들. 주면 말 바꿔 다시 묻기(G3)를 한다
     primary_verified  1차 출처(공시·정부 발표) 원문을 실제로 확인했는가. 글에 붙은 표기가 아니다
     n_independent     같은 사실을 따로 확인해 준 독립 출처 수
 
@@ -85,6 +89,18 @@ def screen(
     winner, share = (x[0] for x in guard.majority(answers))
     split = bool(guard.g1_agreement(answers, threshold)[0])
     checks.append(Check("G1 답의 일치", True, split, f"방향 {int(winner):+d}에 모델의 {share:.0%}가 동의 (기준 {threshold:.0%})"))
+
+    probe = {m: [o for o in runs if o is not None] for m, runs in (probe_outputs or {}).items()}
+    probe = {m: runs for m, runs in probe.items() if runs}
+    if not probe:
+        checks.append(Check("G3 말 바꿔 다시 묻기", False, False, "말 바꾼 글로 다시 묻지 않음"))
+    else:
+        again = np.array([[_representative(runs)] for runs in probe.values()])
+        moved = int(guard.majority(again)[0][0]) != int(winner)
+        swayed = [m for m in answered if m in probe and _representative(probe[m]) != _representative(answered[m])]
+        detail = f"말을 바꾸자 다수결이 {int(winner):+d}에서 {int(guard.majority(again)[0][0]):+d}로 바뀜" if moved else "말을 바꿔도 다수결이 같음"
+        detail += f" (답이 바뀐 모델: {', '.join(swayed)})" if swayed else ""
+        checks.append(Check("G3 말 바꿔 다시 묻기", True, moved, detail))
 
     if primary_verified is None and n_independent is None:
         checks.append(Check("G4b 출처 대조", False, False, "출처 정보를 받지 못해 검사하지 않음"))
@@ -118,10 +134,21 @@ def ask(clients: list[ModelClient], text: str, system: str, n_runs: int, item_id
     return {c.name: [call_once(c, system, inp, run, "live").output for run in range(n_runs)] for c in clients}
 
 
-def screen_disclosure(d: Disclosure, clients: list[ModelClient], system: str, n_runs: int, **kw) -> Verdict:
-    """공시 숫자 한 건을 요약으로 만들어 패널에 묻고 판정한다. 공시 원문에서 옮긴 숫자이므로 1차 출처는 확인된 것으로 본다."""
+def screen_disclosure(
+    d: Disclosure, clients: list[ModelClient], system: str, n_runs: int,
+    *, primary_verified: bool | None = None, probe: bool = False, **kw,
+) -> Verdict:
+    """공시 숫자 한 건을 요약으로 만들어 패널에 묻고 판정한다.
+
+    primary_verified  source.verify_dart 등으로 원문을 확인한 결과. 주지 않으면 출처는 독립 출처 수만으로 판정된다
+    probe             말을 바꾼 요약으로 한 번 더 묻는다. 호출 수가 두 배가 된다
+    """
     outputs = ask(clients, f"{VERIFIED_TAG}\n{render(d)}", system, n_runs, d.item_id)
-    return screen(outputs, figure=key_figure(d), primary_verified=True, n_independent=d.n_independent_sources, **kw)
+    again = ask(clients, f"{VERIFIED_TAG}\n{render_alt(d)}", system, n_runs, d.item_id) if probe else None
+    return screen(
+        outputs, figure=key_figure(d), probe_outputs=again,
+        primary_verified=primary_verified, n_independent=d.n_independent_sources, **kw,
+    )
 
 
 def show(title: str, v: Verdict) -> str:
@@ -149,6 +176,11 @@ def _demo() -> None:
             {m: [out(-1)] * 3 for m in models},
             dict(figure=-32.0, primary_verified=False, n_independent=0),
         ),
+        (
+            "말에 흔들림: 같은 숫자인데 말을 바꾸니 답이 뒤집힘",
+            {m: [out(-1)] * 3 for m in models},
+            dict(figure=-32.0, primary_verified=True, probe_outputs={m: [out(1)] * 3 for m in models}),
+        ),
     ]
     print("※ 지어낸 답으로 판정 과정만 보여 줍니다. 실제 모델과 무관합니다.\n")
     for title, outputs, info in cases:
@@ -161,6 +193,7 @@ def main() -> None:
     mode.add_argument("--mock", action="store_true", help="지어낸 답 세 건으로 판정 과정을 보여 준다")
     mode.add_argument("--numbers", help="공시 숫자가 든 JSON 파일. 실제 모델을 호출한다 (API 키와 비용 필요)")
     parser.add_argument("--only", help="패널 중 일부 모델만 쓴다. 설정 파일의 name을 쉼표로")
+    parser.add_argument("--probe", action="store_true", help="말을 바꾼 요약으로 한 번 더 묻는다 (호출 수 두 배)")
     parser.add_argument("--json", action="store_true", help="판정을 JSON으로 출력한다")
     args = parser.parse_args()
     if args.mock:
@@ -174,8 +207,16 @@ def main() -> None:
         models = [m for m in models if m["name"] in args.only.split(",")]
     d = Disclosure.model_validate_json(Path(args.numbers).read_text(encoding="utf-8"))
     system = (ROOT / "prompts" / "institutional_system.txt").read_text(encoding="utf-8")
+    key = os.environ.get("DART_API_KEY")
+    if key:
+        checked = verify_dart(d.url, d.corp, key)
+        print(f"출처 확인: {checked.detail}")
+    else:
+        checked = None
+        print("환경변수 DART_API_KEY가 없어 출처를 조회하지 못했습니다. 출처는 독립 출처 수만으로 판정합니다.")
     v = screen_disclosure(
         d, build_clients(models), system, cfg["panel"]["n_runs"],
+        primary_verified=checked.verified if checked else None, probe=args.probe,
         threshold=cfg["guard"]["agreement_alert"], k_sources=cfg["guard"]["k_sources"],
     )
     if args.json:

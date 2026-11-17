@@ -47,6 +47,7 @@ pip install -r requirements.txt
 pytest
 PYTHONPATH=src python -m echoguard.pipeline --mock   # 모의 모델로 전체 흐름 실행
 PYTHONPATH=src python -m echoguard.filter --mock     # 필터: 문서 한 건을 통과/검토로 판정하는 예시
+PYTHONPATH=src python -m echoguard.drift 예전.jsonl 지금.jsonl   # 모델이 바뀌었는지 점검
 PYTHONPATH=src python -m echoguard.check             # 실제 모델 시험 호출 (API 키 필요)
 ```
 

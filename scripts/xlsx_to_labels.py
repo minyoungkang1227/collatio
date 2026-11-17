@@ -17,7 +17,7 @@ from pydantic import ValidationError
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 from echoguard.dataset import NewsItem  # noqa: E402
-from echoguard.disclosure import Disclosure, conflicts, flipped, render, to_news_item  # noqa: E402
+from echoguard.disclosure import Disclosure, conflicts, flipped, injected, render, render_alt, to_news_item  # noqa: E402
 from echoguard.labeling import rule_label  # noqa: E402
 
 LABELS = ROOT / "data" / "labels" / "news_labels.csv"
@@ -53,7 +53,7 @@ def main(path: str, labeler: str = "minyoung") -> int:
         print("채운 행이 없습니다.")
         return 1
     items, flips, problems, differs, skipped, checked = [], [], [], [], [], 0
-    disclosures = []
+    disclosures, extra = [], []
     for n, row in d_rows:  # 공시: 숫자에서 요약, 정답, 뒤집은 글을 만든다
         try:
             d = Disclosure.model_validate({k: v for k, v in row.items() if v != ""})
@@ -66,6 +66,9 @@ def main(path: str, labeler: str = "minyoung") -> int:
             continue
         disclosures.append(d)
         items.append(item)
+        extra.append((d.item_id, "paraphrase", render_alt(d)))
+        if injected(d):
+            extra.append((d.item_id, "injection", injected(d)))
         f = flipped(d)
         if f is None:
             skipped.append(f"  {d.item_id}: 전환이거나 100% 넘는 증가라 앞뒤가 맞게 뒤집을 수 없음")
@@ -124,6 +127,7 @@ def main(path: str, labeler: str = "minyoung") -> int:
         w = csv.writer(f)
         w.writerow(["item_id", "perturbation", "text"])
         w.writerows((i, "fact_flip", t) for i, t in flips)
+        w.writerows(extra)
     if disclosures:
         fields = list(Disclosure.model_fields)
         with open(NUMBERS, "w", encoding="utf-8", newline="") as f:

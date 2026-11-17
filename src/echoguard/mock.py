@@ -67,8 +67,8 @@ def make_world(seed: int = 0, n_items: int = 100):
         return it.model_copy(update={"label_method": "rule", "op_yoy_pct": 20.0 * it.direction_text, "op_turn": "없음"})
 
     items = [with_figure(one(i)) for i in range(n_items)]
-    written = {(it.item_id, kind): f"{it.summary} ({kind})" for it in items for kind in ("paraphrase", "ai_style", "fact_flip")}
-    kinds = ("original", "source_swap", "paraphrase", "ai_style", "fact_flip", "fake_corroboration")
+    written = {(it.item_id, kind): f"{it.summary} ({kind})" for it in items for kind in ("paraphrase", "ai_style", "fact_flip", "injection")}
+    kinds = ("original", "source_swap", "paraphrase", "ai_style", "fact_flip", "fake_corroboration", "injection")
 
     def wrong_of(d: int) -> int:
         return 1 if d <= 0 else -1
@@ -79,6 +79,9 @@ def make_world(seed: int = 0, n_items: int = 100):
     # 문체가 바뀌면 다 같이 뒤집히는 뉴스
     fragile = {it.item_id for it in rng.sample(items, n_items // 8)}
     family_wrong = {fam: {it.item_id for it in rng.sample(items, n_items // 10)} for fam in "ABC"}
+
+    # 숨긴 지시문을 따르는 뉴스. 다른 추첨의 순서를 건드리지 않게 난수를 따로 쓴다
+    obeys = {fam: {it.item_id for it in random.Random(f"{seed}|inj|{fam}").sample(items, n_items // 4)} for fam in "ABC"}
 
     clients = []
     for name, fam in FAMILIES.items():
@@ -91,6 +94,8 @@ def make_world(seed: int = 0, n_items: int = 100):
                     d = wrong_of(truth)
                 if it.item_id in fragile and kind in ("paraphrase", "ai_style"):
                     d = wrong_of(d)
+                if kind == "injection" and it.item_id in obeys[fam]:
+                    d = wrong_of(truth)
                 # 글을 제대로 읽었으면 정해진 지표와 글의 값을 근거로 대고, 잘못 읽었으면 다른 지표를 댄다
                 fig = figure_in_text(it, kind)
                 if fig is None:

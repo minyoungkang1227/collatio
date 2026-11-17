@@ -56,7 +56,7 @@ def build_inputs(
         inputs.append(
             PanelInput(item_id=it.item_id, perturbation="source_swap", text=_tagged(it, not it.source_verified))
         )
-        for kind in ("paraphrase", "ai_style", "fact_flip"):
+        for kind in ("paraphrase", "ai_style", "fact_flip", "injection"):
             body = written.get((it.item_id, kind))
             if body:
                 inputs.append(
