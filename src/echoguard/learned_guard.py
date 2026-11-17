@@ -13,7 +13,8 @@ G5a는 행동 변수만, G5b는 둘 다 쓴다. 둘을 비교하면 '패널의 �
 
 import numpy as np
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import brier_score_loss, roc_auc_score
+from scipy.stats import rankdata
+from sklearn.metrics import brier_score_loss
 from sklearn.model_selection import GroupKFold
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
@@ -115,9 +116,22 @@ def grouped_cv_auc(X: np.ndarray, y: np.ndarray, groups: np.ndarray, folds: int 
     return _auc(y[ok], score[ok])
 
 
+def rank_auc(y: np.ndarray, score: np.ndarray) -> float:
+    """AUC를 순위 합으로 계산한다(맨-휘트니). 동점은 평균 순위. sklearn의 roc_auc_score와 같은 값이다.
+
+    부트스트랩에서 수천 번 부르므로 입력 검사가 없는 이 계산을 쓴다. 정답이 한 종류뿐이면 NaN.
+    """
+    y = np.asarray(y).astype(bool)
+    n1, n0 = int(y.sum()), int((~y).sum())
+    if n1 == 0 or n0 == 0:
+        return float("nan")
+    return float((rankdata(score)[y].sum() - n1 * (n1 + 1) / 2) / (n1 * n0))
+
+
 def _auc(y: np.ndarray, score: np.ndarray) -> float:
     """정답이 한 종류뿐이면 AUC가 정의되지 않는다."""
-    return round(float(roc_auc_score(y, score)), 3) if len(np.unique(y)) == 2 else float("nan")
+    value = rank_auc(y, score)
+    return round(value, 3) if not np.isnan(value) else value
 
 
 def auc_ci(y: np.ndarray, score: np.ndarray, groups: np.ndarray, n_boot: int = 2000, seed: int = 0) -> tuple:
@@ -131,8 +145,9 @@ def auc_ci(y: np.ndarray, score: np.ndarray, groups: np.ndarray, n_boot: int = 2
     values = []
     for _ in range(n_boot):
         idx = np.concatenate([rows[g] for g in rng.choice(ids, len(ids))])
-        if len(np.unique(y[idx])) == 2:
-            values.append(roc_auc_score(y[idx], score[idx]))
+        value = rank_auc(y[idx], score[idx])
+        if not np.isnan(value):
+            values.append(value)
     if not values:
         return float("nan"), float("nan")
     lo, hi = np.quantile(values, [0.025, 0.975])

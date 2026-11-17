@@ -1,0 +1,13 @@
+{
+  "item_id": "example",
+  "corp": "가나전자",
+  "date": "2026-10-20",
+  "period": "2026년 3분기",
+  "unit": "억원",
+  "url": "https://example.com/1",
+  "revenue": 8200, "revenue_yoy": -4.1, "revenue_qoq": 6.3,
+  "op": 1150, "op_yoy": -32, "op_qoq": 18.5,
+  "net": 640, "net_yoy": -45.2,
+  "cum_op": 2890, "cum_op_yoy": -12.4,
+  "n_independent_sources": 1, "n_reports": 3
+}

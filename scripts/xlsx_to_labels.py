@@ -11,6 +11,7 @@ import sys
 from collections import Counter
 from pathlib import Path
 
+import yaml
 from openpyxl import load_workbook
 from pydantic import ValidationError
 
@@ -23,6 +24,7 @@ from echoguard.labeling import rule_label  # noqa: E402
 LABELS = ROOT / "data" / "labels" / "news_labels.csv"
 WRITTEN = ROOT / "data" / "labels" / "perturbations.csv"
 NUMBERS = ROOT / "data" / "labels" / "disclosures.csv"  # 옮겨 적은 공시 숫자. 요약과 정답은 이 파일에서 다시 만들 수 있다
+NEWS_FROM = yaml.safe_load((ROOT / "config" / "experiment.yaml").read_text(encoding="utf-8"))["dataset"]["news_from"]
 CSV_COLUMNS = LABELS.read_text(encoding="utf-8").splitlines()[0].split(",")
 TARGETS = {
     "type": {"stock": 70, "macro": 30},
@@ -64,7 +66,7 @@ def main(path: str, labeler: str = "minyoung") -> int:
         except ValueError as e:
             problems.append(f"  공시 {n}행: {e}")
             continue
-        wrong = quality(d)
+        wrong = quality(d, NEWS_FROM)
         if wrong:
             problems += [f"  공시 {n}행 ({d.corp}): {w}" for w in wrong]
             continue

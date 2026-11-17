@@ -1,14 +1,23 @@
 # EchoGuard
 
-여러 AI가 같은 금융 뉴스에 **다 같이 틀리는 순간**을 재고, 그때 경보를 내는 방어 계층.
+AI가 낸 답을 사람이나 다음 시스템으로 넘기기 전에 거르는 필터. 여러 AI가 같은 금융 문서에 **다 같이 틀리는 순간**을 재고, 의심스러운 답을 사람에게 넘긴다.
 
-Black-box stress test for correlated errors across LLMs on Korean financial news.
+A filter and black-box stress test for correlated errors across LLMs on Korean financial text.
 
-> 상태 (2026-11-16): 모의 모델로 전체 흐름이 돈다. 실제 공시 10건으로 시범 실행을 하는 중이다(1,080회 호출 중 720회 완료). 뉴스 100건의 본 실행과 그 결과는 아직 없다.
+> 상태 (2026-11-18): 필터와 실험 틀이 모의 모델로 끝까지 돈다. 실제 모델로 돌린 것은 두 가지뿐이다. 공시 10건 시범 실행(원문 오답 0건이라 설계를 바꿨다)과 오늘의 뉴스 4건 판정 두 차례(기사 본문 수집이 대부분 실패했다). 가드의 성능 수치는 아직 없다. 기록은 [docs/pilot_log.md](docs/pilot_log.md).
 
 ## 방향
 
-목적은 방어다. AI 사용이 늘면서 금융회사와 일반 이용자에게 생길 문제를 미리 찾고, 재고, 대안을 준비한다. 다루는 문제의 목록은 [docs/problem_register.md](docs/problem_register.md).
+목적은 방어다. 본체는 가드이고, 측정은 가드가 실제로 잡는지 확인하는 수단이다. 답을 고치지 않는다. 걸러서 사람에게 넘긴다. 다루는 문제의 목록은 [docs/problem_register.md](docs/problem_register.md), 운영 쪽 위험은 [docs/operations.md](docs/operations.md).
+
+## 쓰는 길 두 가지
+
+| 입력 | 경로 | 명령 |
+|---|---|---|
+| 잠정실적 공시 (숫자) | 숫자 → 요약 → 모델 패널 → 필터 | `python -m echoguard.filter --numbers data/examples/disclosure_example.json` |
+| 정책 뉴스 (글) | 뉴스 → ShockLens 사건 해석 → 필터 | `python ..\echoguard\integrations\shocklens_screen.py --today` |
+
+필터가 보는 것: 입력의 모순(G0), 답의 일치(G1), 말을 바꿔도 같은가(G3), 출처(G4b), 근거(G6). 하나라도 걸리면 검토다. 판정과 사람의 검토 결과는 기록에 남는다. 자세한 것은 [docs/filter.md](docs/filter.md), ShockLens 연동은 [docs/shocklens_check.md](docs/shocklens_check.md).
 
 ## 왜 만드나
 

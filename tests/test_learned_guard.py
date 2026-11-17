@@ -81,3 +81,18 @@ def test_behavior_alone_cannot_tell_fabricated_news_but_sources_can():
     assert a["eval_fabrication_auc"] < 0.65
     assert b["eval_fabrication_auc"] > 0.85
     assert set(a["coefficients"]) == set(lg.BEHAVIOR)
+
+
+def test_rank_auc_matches_sklearn_including_ties():
+    import numpy as np
+    from sklearn.metrics import roc_auc_score
+
+    from echoguard.learned_guard import rank_auc
+
+    rng = np.random.default_rng(0)
+    for _ in range(20):
+        y = rng.integers(0, 2, 60)
+        s = rng.integers(0, 6, 60) / 5  # 동점이 많이 생기게
+        if len(np.unique(y)) == 2:
+            assert abs(rank_auc(y, s) - roc_auc_score(y, s)) < 1e-12
+    assert np.isnan(rank_auc(np.ones(5), np.arange(5)))

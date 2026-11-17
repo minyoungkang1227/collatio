@@ -39,9 +39,23 @@ def load(path: str | Path) -> list[dict]:
     return [json.loads(line) for line in p.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
+def _last_hash(path: str | Path) -> str:
+    """마지막 줄의 해시. 기록이 길어져도 덧붙이는 비용이 늘지 않게 파일 끝만 읽는다."""
+    p = Path(path)
+    if not p.exists() or p.stat().st_size == 0:
+        return GENESIS
+    with open(p, "rb") as f:
+        size, block = f.seek(0, 2), 4096
+        while True:
+            f.seek(max(size - block, 0))
+            lines = [l for l in f.read().splitlines() if l.strip()]
+            if len(lines) > 1 or block >= size:
+                return json.loads(lines[-1].decode("utf-8"))["hash"] if lines else GENESIS
+            block *= 4
+
+
 def _append(path: str | Path, body: dict) -> dict:
-    entries = load(path)
-    body = {**body, "at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "prev": entries[-1]["hash"] if entries else GENESIS}
+    body = {**body, "at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "prev": _last_hash(path)}
     entry = {**body, "hash": _hash(body)}
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     with open(path, "a", encoding="utf-8") as f:
