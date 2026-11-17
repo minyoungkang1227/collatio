@@ -36,8 +36,8 @@ class Disclosure(BaseModel):
     op: float
     op_yoy: Change
     op_qoq: Change
-    net: float
-    net_yoy: Change
+    net: float | None = None         # 순이익을 적지 않는 공시가 있다
+    net_yoy: Change | None = None
     cum_op: float | None = None      # 누계 영업이익. 1분기 공시처럼 누계가 따로 없으면 비운다
     cum_op_yoy: Change | None = None
     n_independent_sources: int = 1   # 공시 원문 자체를 1로 센다
@@ -64,7 +64,12 @@ def quality(d: "Disclosure", news_from: str | None = None, today: str | None = N
     모델에 넣기 전에 하는 입력 점검(G0)이다. 원문과 같은지는 여기서 알 수 없고, 숫자끼리의 모순과 형식만 본다.
     """
     found = []
-    for name, amount, change in (("영업이익", d.op, d.op_yoy), ("영업이익(전기 대비)", d.op, d.op_qoq), ("순이익", d.net, d.net_yoy)):
+    checks = [("영업이익", d.op, d.op_yoy), ("영업이익(전기 대비)", d.op, d.op_qoq)]
+    if (d.net is None) != (d.net_yoy is None):
+        found.append("순이익과 그 변동 중 하나만 적혀 있다")
+    elif d.net is not None:
+        checks.append(("순이익", d.net, d.net_yoy))
+    for name, amount, change in checks:
         if amount >= 0 and change in ("적자전환", "적자지속"):
             found.append(f"{name}: 금액은 이익인데 변동이 {change}이다")
         if amount < 0 and change == "흑자전환":
@@ -85,7 +90,7 @@ def quality(d: "Disclosure", news_from: str | None = None, today: str | None = N
     if d.cum_op is not None and "1분기" in d.period and d.cum_op != d.op:
         found.append("1분기인데 누계 영업이익이 분기 영업이익과 다르다")
     for name, change in (("영업이익 전년 동기 대비", d.op_yoy), ("매출액 전년 동기 대비", d.revenue_yoy), ("순이익 전년 동기 대비", d.net_yoy)):
-        if not isinstance(change, str) and abs(change) > 1000:
+        if change is not None and not isinstance(change, str) and abs(change) > 1000:
             found.append(f"{name}: 변동률이 1000%를 넘는다({_num(change)}%). 자릿수를 확인할 것")
     try:
         y, m, day = (int(x) for x in d.date.split("-"))
@@ -150,8 +155,9 @@ def render(d: Disclosure) -> str:
         f"{y}년 {m}월 {day}일 공시된 {d.corp}의 {d.period} 잠정실적이다.",
         "당해 분기 " + _line("매출액", "매출액", d.revenue, d.unit, [("전년 동기 대비", d.revenue_yoy), ("전기 대비", d.revenue_qoq)]),
         "당해 분기 " + _line("영업이익", "영업손실", d.op, d.unit, [("전년 동기 대비", d.op_yoy), ("전기 대비", d.op_qoq)]),
-        "당해 분기 " + _line("순이익", "순손실", d.net, d.unit, [("전년 동기 대비", d.net_yoy)]),
     ]
+    if d.net is not None and d.net_yoy is not None:
+        parts.append("당해 분기 " + _line("순이익", "순손실", d.net, d.unit, [("전년 동기 대비", d.net_yoy)]))
     if d.cum_op is not None and d.cum_op_yoy is not None:
         parts.append("누계 " + _line("영업이익", "영업손실", d.cum_op, d.unit, [("전년 동기 대비", d.cum_op_yoy)]))
     return " ".join(parts)
@@ -177,10 +183,9 @@ def render_alt(d: Disclosure) -> str:
     def amount(gain: str, loss: str, x: float) -> str:
         return f"{gain if x >= 0 else loss} {_num(abs(x))}{d.unit}"
 
-    parts = [
-        f"{d.corp}의 {d.period} 잠정실적이 {y}년 {m}월 {day}일에 나왔다.",
-        f"이번 분기 {amount('순이익', '순손실', d.net)}을 기록했고, {_said(d.net_yoy, last_year)}.",
-    ]
+    parts = [f"{d.corp}의 {d.period} 잠정실적이 {y}년 {m}월 {day}일에 나왔다."]
+    if d.net is not None and d.net_yoy is not None:
+        parts.append(f"이번 분기 {amount('순이익', '순손실', d.net)}을 기록했고, {_said(d.net_yoy, last_year)}.")
     if d.cum_op is not None and d.cum_op_yoy is not None:
         parts.append(f"올해 누계로는 {amount('영업이익', '영업손실', d.cum_op)}이며, {_said(d.cum_op_yoy, last_year + '까지의 누계')}.")
     parts += [
