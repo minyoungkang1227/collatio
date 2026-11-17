@@ -51,3 +51,30 @@ python ..\echoguard\integrations\shocklens_agreement.py
 ## 결과
 
 아직 없다.
+
+## 뉴스를 ShockLens로 해석하고 EchoGuard로 거르기
+
+위의 점검은 정답이 있는 과거 사건으로 "모델들이 함께 틀리는가"를 잰다. 아래는 정답이 없는 오늘의 뉴스에 필터를 실제로 거는 것이다.
+
+```
+cd C:\Users\admin\shocklens
+python ..\echoguard\integrations\shocklens_screen.py --mock --file 뉴스.txt    # 호출 없이 흐름 확인
+python ..\echoguard\integrations\shocklens_screen.py --today                   # 오늘 헤드라인에서 정책 토픽을 골라 판정
+```
+
+같은 뉴스를 모델 네 개가 각자 ShockLens의 Event Analyst로 해석한다. EchoGuard가 그 해석들을 보고 통과, 검토, 범위 밖 중 하나로 판정한다.
+
+| 검사 | 걸리는 경우 |
+|---|---|
+| G0 입력 점검 | 글 안에 지시문으로 의심되는 문장이 있다 (ShockLens의 탐지 결과). 본문이 300자보다 짧다 |
+| 응답 | 호출이 실패해 답을 내지 못한 모델이 있다 |
+| 정책 사건 여부 | 정책 사건인지부터 모델들의 판단이 갈린다. 전부 아니라고 하면 "범위 밖" |
+| G1 답의 일치 | 수단, 방향, 발동국 중 하나라도 갈린다 |
+| G6 근거 대조 | 수단이나 발동국에 근거 문장을 대지 못한 모델이 있다 |
+| G4a 보도 매체 수 | 이 토픽을 다룬 매체가 한 곳뿐이다. 받아쓴 기사도 세므로 독립 확인은 아니다 |
+
+판정은 `data/audit/shocklens_decisions.jsonl`에 남고, 모델별 답은 `data/runs/shocklens/screen_날짜.jsonl`에 남는다.
+
+정답이 없으므로 "통과"가 "맞았다"를 뜻하지 않는다. 모델들이 같은 근거로 같은 해석을 했다는 뜻이다. 함께 틀린 해석은 통과한다. 그 비율이 얼마인지는 위의 과거 사건 점검이 답한다.
+
+잠정실적 공시는 ShockLens가 다루지 않는다. 공시는 `python -m echoguard.filter --numbers`로 판정한다.
