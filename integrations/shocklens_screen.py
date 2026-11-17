@@ -152,6 +152,12 @@ def screen_event(per_model: dict[str, list[dict]], text: str, n_outlets: int | N
     return Verdict("검토" if flagged else "통과", None, worst, checks), {m: {k: (list(v) if isinstance(v, tuple) else v) for k, v in a.items()} for m, a in answers.items()}
 
 
+def _overlap(a: str, b: str) -> float:
+    """두 제목이 얼마나 겹치는가. 두 글자 이상 낱말의 자카드 값."""
+    ta, tb = (set(w for w in re.findall(r"[0-9A-Za-z가-힣]{2,}", s.lower())) for s in (a, b))
+    return len(ta & tb) / len(ta | tb) if ta and tb else 0.0
+
+
 def article_of(topic: dict, heads: list[dict], tries: int = 6) -> tuple[str, str | None, str]:
     """토픽의 기사 본문을 찾는다. (글, 본문을 가져온 주소 또는 None, 실패 사유)
 
@@ -173,6 +179,23 @@ def article_of(topic: dict, heads: list[dict], tries: int = 6) -> tuple[str, str
         if art.get("text") and len(art["text"]) >= SHORT:
             return f"{h['title']}.\n{art['text'][:6000]}", h["url"], ""
         reasons.append(str(art.get("error") or f"본문 {len(art.get('text') or '')}자")[:60])
+    # 피드의 주소로 안 되면 헤드라인으로 검색해 같은 사건을 다룬 매체 기사를 찾는다 (ShockLens의 검색 도구, GDELT 우선)
+    from tools.news import search_news
+
+    found = search_news(topic["title"], max_results=8)
+    if found.get("error") and not found["results"]:
+        reasons.append(f"검색 실패({found['error'][:40]})")
+    for r in found["results"]:
+        if "news.google.com" in r["url"] or _overlap(topic["title"], r["title"]) < 0.2:
+            continue  # 제목이 충분히 겹치지 않으면 다른 사건일 수 있다
+        try:
+            art = fetch_article(r["url"])
+        except Exception as e:
+            reasons.append(type(e).__name__)
+            continue
+        if art.get("text") and len(art["text"]) >= SHORT:
+            return f"{r['title']}.\n{art['text'][:6000]}", r["url"], ""
+        reasons.append(str(art.get("error") or "본문 짧음")[:40])
     titles = [by_id[i]["title"] for i in topic["headline_ids"] if i in by_id][:8]
     return "\n".join(f"{t}." for t in titles), None, "; ".join(reasons) or "주소 없음"
 
@@ -279,6 +302,8 @@ def main() -> None:
             verdict, answers = screen_event(per_model, item["text"], item["n_outlets"], threshold)
             tally[verdict.decision] += 1
             print(show(f"{item['id']} {item['title']}", verdict).replace("  패널의 답: 없음\n", ""))
+            if item["url"]:
+                print(f"  읽은 기사: {item['url']}")
             for m, ans in answers.items():
                 print(f"    {m}: {json.dumps(ans, ensure_ascii=False)}")
             print()
