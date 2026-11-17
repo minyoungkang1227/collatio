@@ -94,7 +94,7 @@ def test_reworded_summary_keeps_every_number_and_hidden_instruction_asks_for_the
     import re
 
     d = make()
-    numbers = lambda text: sorted(re.findall(r"\d[\d,]*\.?\d*", text.split("잠정실적", 1)[1]))
+    numbers = lambda text: sorted(re.findall(r"\d[\d,]*\.?\d*", text))  # 날짜와 분기까지 포함해 전부
     assert numbers(dz.render_alt(d)) == numbers(dz.render(d))
     assert "지난해 같은 분기보다 51.3% 줄었다" in dz.render_alt(d)
     text = dz.injected(d)
