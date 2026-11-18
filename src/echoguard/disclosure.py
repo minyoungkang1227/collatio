@@ -28,7 +28,7 @@ class Disclosure(BaseModel):
     corp: str
     date: str               # 공시일 YYYY-MM-DD
     period: str             # 예: 2026년 3분기
-    unit: Literal["백만원", "억원"]
+    unit: Literal["백만원", "억원", "조원"]
     url: str
     revenue: float          # 당해 분기 금액. 손실은 음수
     revenue_yoy: Change     # 전년 동기 대비. 32% 감소면 -32
@@ -58,10 +58,12 @@ class Disclosure(BaseModel):
         return v
 
 
-def quality(d: "Disclosure", news_from: str | None = None, today: str | None = None) -> list[str]:
+def quality(d: "Disclosure", news_from: str | None = None, today: str | None = None, typed: bool = True) -> list[str]:
     """옮겨 적은 숫자가 서로 앞뒤가 맞는지 본다. 어긋난 곳을 사람이 읽을 문장으로 돌려준다. 비어 있으면 이상 없음.
 
     모델에 넣기 전에 하는 입력 점검(G0)이다. 원문과 같은지는 여기서 알 수 없고, 숫자끼리의 모순과 형식만 본다.
+    typed는 사람이 손으로 옮긴 숫자인가다. 손으로 옮길 때 생기는 실수(단위·자릿수 혼동)를 의심하는 검사는
+    코드가 원문에서 읽은 숫자에는 걸지 않는다. 매출보다 큰 영업손실이나 1000%를 넘는 증감은 실제 공시에 있다.
     """
     found = []
     checks = [("영업이익", d.op, d.op_yoy), ("영업이익(전기 대비)", d.op, d.op_qoq)]
@@ -83,14 +85,14 @@ def quality(d: "Disclosure", news_from: str | None = None, today: str | None = N
     for name, change in (("매출액 전년 동기 대비", d.revenue_yoy), ("매출액 전기 대비", d.revenue_qoq)):
         if isinstance(change, str):
             found.append(f"{name}: 매출에는 {change}이 있을 수 없다")
-    if abs(d.op) > abs(d.revenue) > 0:
+    if typed and abs(d.op) > abs(d.revenue) > 0:
         found.append("영업이익(손실)이 매출액보다 크다. 단위나 자릿수를 확인할 것")
     if (d.cum_op is None) != (d.cum_op_yoy is None):
         found.append("누계 영업이익과 그 변동률 중 하나만 적혀 있다")
     if d.cum_op is not None and "1분기" in d.period and d.cum_op != d.op:
         found.append("1분기인데 누계 영업이익이 분기 영업이익과 다르다")
     for name, change in (("영업이익 전년 동기 대비", d.op_yoy), ("매출액 전년 동기 대비", d.revenue_yoy), ("순이익 전년 동기 대비", d.net_yoy)):
-        if change is not None and not isinstance(change, str) and abs(change) > 1000:
+        if typed and change is not None and not isinstance(change, str) and abs(change) > 1000:
             found.append(f"{name}: 변동률이 1000%를 넘는다({_num(change)}%). 자릿수를 확인할 것")
     try:
         y, m, day = (int(x) for x in d.date.split("-"))

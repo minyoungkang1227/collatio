@@ -46,7 +46,7 @@ def main(n: int = 10, labeler: str = "code") -> int:
             continue
         parsed = dart.parse(path.read_text(encoding="utf-8", errors="replace"), found.group(1), item_id, name)
         d = parsed.disclosure
-        wrong = parsed.problems + (quality(d, news_from) if d else [])
+        wrong = parsed.problems + (quality(d, news_from, typed=False) if d else [])
         if d is None or wrong:
             left_out.append(f"  {item_id} {name}: " + "; ".join(wrong))
             continue

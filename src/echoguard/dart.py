@@ -48,7 +48,14 @@ def _number(text: str) -> float | None:
         return None
 
 
-def _change(current: float, base: float | None, pct: str, turn: str, label: str, problems: list[str]) -> Change | None:
+def _half_unit(text: str) -> float:
+    """적힌 숫자의 반올림 오차. '107.40'은 0.005, '1,133'은 0.5, '12'는 0.5."""
+    digits = text.replace(",", "").replace("%", "").strip().strip("()")
+    return 0.5 * 10 ** -(len(digits.split(".")[1]) if "." in digits else 0)
+
+
+def _change(current: float, base: float | None, pct: str, turn: str, label: str, problems: list[str],
+            eps_current: float = 0.5, eps_base: float = 0.5) -> Change | None:
     """증감을 정한다. 전환 여부가 적혀 있으면 그것을, 둘 다 손실이면 적자지속을, 아니면 적힌 증감율을 쓴다."""
     stated, word = _number(pct), turn.strip()
     if base is None:
@@ -71,8 +78,9 @@ def _change(current: float, base: float | None, pct: str, turn: str, label: str,
         return None
     if base != 0:
         computed = (current - base) / abs(base) * 100
-        # 금액은 단위로 반올림되어 있다(±0.5). 그 오차가 증감율에 얼마나 번지는지를 허용 폭으로 쓴다
-        slack = 0.15 + 55 * (abs(current) / base**2 + 1 / abs(base))
+        # 금액과 증감율은 반올림되어 적힌다. 그 오차가 증감율에 얼마나 번지는지를 허용 폭으로 쓴다
+        # (회사마다 소수 자릿수가 다르다. 증감율을 정수로만 적는 곳도 있다)
+        slack = 0.02 + _half_unit(pct) + 110 * (eps_base * abs(current) / base**2 + eps_current / abs(base))
         if abs(computed - stated) > slack:
             problems.append(f"{label}: 적힌 증감율 {stated:g}%가 금액에서 계산한 {computed:.2f}%와 다르다")
     return stated
@@ -94,8 +102,8 @@ def parse(xml: str, rcept_no: str, item_id: str, company: str = "") -> Parsed:
     if section and "연결" not in section:
         notes.append("연결이 아닌 별도 기준 실적이다")
 
-    unit = next((m.group(1) for t in flat if (m := re.search(r"단위\s*:\s*(백만원|억원|천원|원)\b", t))), None)
-    if unit not in ("백만원", "억원"):
+    unit = next((m.group(1) for t in flat if (m := re.search(r"단위\s*:\s*(조원|억원|백만원|천원|원)", t))), None)
+    if unit not in ("백만원", "억원", "조원"):
         return Parsed(None, notes, problems + [f"단위를 읽지 못했거나 다루지 않는 단위다: {unit}"])
 
     spans = {r[0]: (r[1], r[3]) for r in rows if len(r) == 4 and r[2] == "~" and re.fullmatch(r"\d{4}-\d{2}-\d{2}", r[1])}
@@ -121,16 +129,17 @@ def parse(xml: str, rcept_no: str, item_id: str, company: str = "") -> Parsed:
         cur, cum = table(name)
         if cur is None or _number(cur[2]) is None:
             return None
-        amount = _number(cur[2])
+        amount, e = _number(cur[2]), _half_unit(cur[2])
         out = {
             "amount": amount,
-            "qoq": _change(amount, _number(cur[3]), cur[4], cur[5], f"{name} 전기 대비", problems),
-            "yoy": _change(amount, _number(cur[6]), cur[7], cur[8], f"{name} 전년 동기 대비", problems),
+            "qoq": _change(amount, _number(cur[3]), cur[4], cur[5], f"{name} 전기 대비", problems, e, _half_unit(cur[3])),
+            "yoy": _change(amount, _number(cur[6]), cur[7], cur[8], f"{name} 전년 동기 대비", problems, e, _half_unit(cur[6])),
             "cum": None, "cum_yoy": None,
         }
         if cum is not None and len(cum) >= 8 and _number(cum[1]) is not None:
             out["cum"] = _number(cum[1])
-            out["cum_yoy"] = _change(out["cum"], _number(cum[5]), cum[6], cum[7], f"{name} 누계 전년 동기 대비", problems)
+            out["cum_yoy"] = _change(out["cum"], _number(cum[5]), cum[6], cum[7], f"{name} 누계 전년 동기 대비", problems,
+                                     _half_unit(cum[1]), _half_unit(cum[5]))
         return out
 
     revenue, op, net = read("매출액"), read("영업이익"), read("당기순이익")
