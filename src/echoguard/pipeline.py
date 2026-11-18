@@ -64,6 +64,9 @@ def analyze(records, items: list[NewsItem], clients: list[ModelClient], cfg: dic
         },
         "error_consistency": round(metrics.error_consistency(original, truth), 3),
         "diversification": metrics.diversification(original, truth),
+        "panel_value": (lambda v: {**v, "best_single_model": models[v["best_single_model"]], "accuracy_by_model": dict(zip(models, v["accuracy_by_model"]))})(
+            metrics.panel_value(original, truth, strata, seed=seed)
+        ),
         "wrong_answer_agreement": {
             "value": round(metrics.wrong_answer_agreement(original, truth), 3),
             "random_baseline": metrics.WRONG_AGREEMENT_BASELINE,

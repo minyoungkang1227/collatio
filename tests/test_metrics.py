@@ -161,3 +161,21 @@ def test_error_consistency_hand_value():
     assert metrics.error_consistency(stack([a, b]), truth) == pytest.approx((0.8 - 0.52) / (1 - 0.52))
     assert metrics.error_consistency(stack([a, a]), truth) == pytest.approx(1.0)
     assert np.isnan(metrics.error_consistency(stack([[1] * 10, [1] * 10]), truth))  # 아무도 안 틀림
+
+
+def test_panel_value_separates_independent_errors_from_shared_ones():
+    import numpy as np
+
+    from echoguard.metrics import panel_value
+
+    rng = np.random.default_rng(0)
+    n, truth, strata = 400, np.ones(400, dtype=int), np.array(["a"] * 400)
+
+    def runs_from(wrong):  # (모델, 뉴스) 오답 여부 → (모델, 뉴스, 반복 1)
+        return np.where(wrong, -1.0, 1.0)[:, :, None]
+
+    independent = runs_from(rng.random((5, n)) < 0.3)             # 다섯 모델이 따로따로 30% 틀린다
+    shared = runs_from(np.tile(rng.random(n) < 0.3, (5, 1)))      # 다섯 모델이 같은 뉴스에서 함께 틀린다
+    a, b = panel_value(independent, truth, strata), panel_value(shared, truth, strata)
+    assert a["panel_minus_best"] > 0.05 and abs(a["lost_to_shared_errors"]) < 0.03   # 따로 틀리면 다수결이 이긴다
+    assert b["panel_minus_best"] == 0 and b["lost_to_shared_errors"] > 0.1            # 함께 틀리면 다수결이 못 고친다

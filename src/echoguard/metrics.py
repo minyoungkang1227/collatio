@@ -274,3 +274,58 @@ def error_consistency(runs: np.ndarray, truth: np.ndarray) -> float:
             observed = float((wrong[a] == wrong[b]).mean())
             values.append((observed - expected) / (1 - expected))
     return float(np.mean(values)) if values else float("nan")
+
+
+def _plurality_correct(answers: np.ndarray, truth: np.ndarray) -> np.ndarray:
+    """뉴스별로 패널의 다수결이 정답인가. 가장 많이 나온 답이 하나뿐이고 그것이 정답일 때만 True. 동률은 틀린 것으로 센다."""
+    out = np.zeros(answers.shape[1], dtype=bool)
+    for j, column in enumerate(answers.T):
+        values, counts = np.unique(column[~np.isnan(column)], return_counts=True)
+        if len(values) and (counts == counts.max()).sum() == 1:
+            out[j] = values[counts.argmax()] == truth[j]
+    return out
+
+
+def panel_value(runs: np.ndarray, truth: np.ndarray, strata: np.ndarray, n_shuffle: int = 500, seed: int = 0) -> dict:
+    """모델을 여러 개 쓰는 것이 값어치가 있는가. 두 가지를 본다.
+
+    1. 패널의 다수결이 가장 잘하는 모델 하나보다 나은가.
+       가장 잘하는 모델은 결과를 보고 고르므로 이 비교는 모델 하나 쪽에 유리하다. 그런데도 패널이 낫지 않으면
+       여러 모델을 쓰는 까닭이 정확도는 아니라는 뜻이다(가드에는 여전히 여러 모델이 필요하다).
+    2. 모델들의 오답이 서로 독립이었다면 다수결이 얼마나 맞았을까(콩도르세 귀무 모형).
+       각 모델의 답을 같은 층·같은 정답의 뉴스들 사이에서 모델마다 따로 섞는다. 모델별 정확도와 난이도별 정확도는
+       그대로 두고, 같은 뉴스에서 함께 틀리는 것만 없앤다. 실제 정확도가 이보다 낮은 만큼이 함께 틀려서 잃은 것이다.
+
+    "Nine Judges, Two Effective Votes"(arXiv:2605.29800)의 방법을 따랐다. 사전에 정한 가설이 아니므로 탐색용으로 보고한다.
+    """
+    answers = model_answers(runs)
+    correct = answers == truth[None, :]
+    by_model = correct.mean(axis=1)
+    best = int(by_model.argmax())
+    panel = _plurality_correct(answers, truth)
+    ties = np.array([
+        (lambda c: len(c) > 0 and (c == c.max()).sum() > 1)(np.unique(col[~np.isnan(col)], return_counts=True)[1]) for col in answers.T
+    ])
+    rng = np.random.default_rng(seed)
+    groups = [np.flatnonzero((strata == s) & (truth == t)) for s in np.unique(strata) for t in np.unique(truth)]
+    groups = [g for g in groups if len(g) > 1]
+    null = []
+    for _ in range(n_shuffle):
+        shuffled = answers.copy()
+        for idx in groups:
+            for m in range(len(answers)):
+                shuffled[m, idx] = answers[m, rng.permutation(idx)]
+        null.append(_plurality_correct(shuffled, truth).mean())
+    independent = float(np.mean(null))
+    lo, hi = bootstrap_ci(lambda i: float(panel[i].mean() - correct[best, i].mean()), len(truth), seed=seed)
+    return {
+        "accuracy_by_model": [round(float(a), 3) for a in by_model],
+        "best_single_model": best,
+        "best_single_accuracy": round(float(by_model[best]), 3),
+        "panel_majority_accuracy": round(float(panel.mean()), 3),
+        "panel_minus_best": round(float(panel.mean() - by_model[best]), 3),
+        "panel_minus_best_ci95": [round(lo, 3), round(hi, 3)],
+        "tie_share": round(float(ties.mean()), 3),
+        "accuracy_if_independent": round(independent, 3),
+        "lost_to_shared_errors": round(independent - float(panel.mean()), 3),
+    }
