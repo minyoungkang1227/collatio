@@ -109,6 +109,30 @@ def analyze(records, items: list[NewsItem], clients: list[ModelClient], cfg: dic
         "share_following_the_rule": {m: round(float(np.nanmean(all_basis[i, known])), 3) if known.any() else None for i, m in enumerate(models)},
         "metrics_cited_on_originals": dict(sorted(cited.items(), key=lambda kv: -kv[1])),
     }
+    # 원문 표: 깔끔한 요약 대신 공시의 표를 그대로 넣었을 때. 사실은 원문과 같으므로 정답도 같다
+    raw = asked("raw_table")
+    if raw.any():
+        a, t, s = arr("raw_table")[:, raw, :], truth[raw], strata[raw]
+        rb = store.basis_share(records, "raw_table", models, items)[:, raw]
+        wrong = metrics.error_matrix(a, t)
+        report["raw_table"] = {
+            "n_items": int(raw.sum()),
+            "accuracy": {m: round(float(1 - wrong[i].mean()), 3) for i, m in enumerate(models)},
+            "accuracy_on_clean_summary_same_items": {m: round(float(1 - metrics.error_matrix(original[:, raw, :], t)[i].mean()), 3) for i, m in enumerate(models)},
+            "share_following_the_rule": {m: round(float(np.nanmean(rb[i])), 3) for i, m in enumerate(models)},
+            "intra_model_dispersion": dict(zip(models, metrics.intra_model_dispersion(a).round(3).tolist())),
+            "items_with_any_wrong_model": [ids[j] for j in np.flatnonzero(raw)[wrong.any(axis=0)]],
+            "items_where_all_models_wrong": [ids[j] for j in np.flatnonzero(raw)[wrong.all(axis=0)]],
+            "pairwise_error_correlation": round(metrics.pairwise_error_correlation(a, t), 3),
+            "panel_value": (lambda v: {**v, "best_single_model": models[v["best_single_model"]], "accuracy_by_model": dict(zip(models, v["accuracy_by_model"]))})(
+                metrics.panel_value(a, t, s, seed=seed)
+            ),
+            "G1_agreement": guard.evaluate(guard.g1_agreement(metrics.model_answers(a), thr), metrics.model_answers(a), t),
+            "G6_basis_check": guard.evaluate(guard.g6_basis(metrics.model_answers(a), thr, rb), metrics.model_answers(a), t),
+        }
+    else:
+        report["raw_table"] = "이 변형을 보내지 않음"
+
     # 숨긴 지시문: 글의 사실은 그대로이고 '반대로 답하라'는 문장만 붙였다. 따르면 실제 사실과 어긋난다
     inj = asked("injection")
     if inj.any():
@@ -242,16 +266,19 @@ def _learned_guard(records, items, models, families, ids, n_runs, truth, cfg, se
     return out
 
 
-def run(items, written, clients, cfg: dict, runs_path: Path) -> dict:
+def run(items, written, clients, cfg: dict, runs_path: Path, kinds: list[str] | None = None) -> dict:
     """호출하고, 저장하고, 저장한 것을 다시 읽어 분석한다.
 
     runs_path에 이미 기록이 있으면 그만큼은 건너뛰고 이어서 한다.
     호출 도중 오류(잔액 부족, 하루 한도 등)가 나면 그때까지의 기록은 파일에 남는다.
+    kinds를 주면 그 변형의 입력만 새로 보낸다. 이미 받아 둔 다른 변형의 기록은 분석에 그대로 쓴다.
     """
     # 건수가 계획(100건)보다 적은 시범 실행에서는 같은 비율(6:4)로 나눈다
     n_tune = min(cfg["dataset"]["n_tune"], round(len(items) * 0.6))
     items = assign_split(items, n_tune, cfg["seed"])
     inputs = build_inputs(items, written, cfg["guard"]["fake_reports"])
+    if kinds:
+        inputs = [i for i in inputs if i.perturbation in kinds]
     system = (ROOT / "prompts" / "institutional_system.txt").read_text(encoding="utf-8")
     done = {store.key(r) for r in store.load(runs_path)} if Path(runs_path).exists() else set()
     run_panel(
@@ -266,6 +293,7 @@ def main() -> None:
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--mock", action="store_true", help="모의 모델로 전체 흐름을 돌린다")
     mode.add_argument("--run", action="store_true", help="라벨 파일의 뉴스로 실제 모델을 호출한다 (API 키와 비용 필요)")
+    parser.add_argument("--kinds", help="이 변형의 입력만 보낸다. 쉼표로 (예: original,raw_table)")
     parser.add_argument("--only", help="패널 중 일부 모델만 쓴다. 설정 파일의 name을 쉼표로 (예: gpt-sol,claude-sonnet)")
     args = parser.parse_args()
     cfg = yaml.safe_load((ROOT / "config" / "experiment.yaml").read_text(encoding="utf-8"))
@@ -298,7 +326,10 @@ def main() -> None:
                 parser.error(f"설정 파일에 없는 모델입니다: {unknown}")
             models = [m for m in models if m["name"] in wanted]
             print(f"※ 패널 일부({len(models)}개)만 씁니다. 사전에 정한 패널과 다르므로 이 결과는 탐색용입니다.")
-        report = run(items, written, build_clients(models), cfg, runs_path)
+        kinds = args.kinds.split(",") if args.kinds else None
+        if kinds:
+            print(f"※ 변형 일부({', '.join(kinds)})만 새로 보냅니다.")
+        report = run(items, written, build_clients(models), cfg, runs_path, kinds)
     print(json.dumps(report, ensure_ascii=False, indent=2))
 
 

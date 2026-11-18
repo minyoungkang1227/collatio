@@ -44,7 +44,8 @@ def main(n: int = 10, labeler: str = "code") -> int:
         if path is None or not path.exists():
             left_out.append(f"  {item_id} {name}: 원문이 없음. python scripts/fetch_disclosures.py {n} 를 먼저 실행")
             continue
-        parsed = dart.parse(path.read_text(encoding="utf-8", errors="replace"), found.group(1), item_id, name)
+        xml = path.read_text(encoding="utf-8", errors="replace")
+        parsed = dart.parse(xml, found.group(1), item_id, name)
         d = parsed.disclosure
         wrong = parsed.problems + (quality(d, news_from, typed=False) if d else [])
         if d is None or wrong:
@@ -59,6 +60,7 @@ def main(n: int = 10, labeler: str = "code") -> int:
         items.append(item)
         kept.append(d)
         written.append((item_id, "paraphrase", render_alt(d)))
+        written.append((item_id, "raw_table", dart.raw_text(xml, found.group(1), name)))
         if injected(d):
             written.append((item_id, "injection", injected(d)))
         f2 = flipped(d)
@@ -92,7 +94,7 @@ def main(n: int = 10, labeler: str = "code") -> int:
     print(f"공시 {len(rows)}건 중 {len(items)}건을 썼습니다.")
     print(f"  방향: 긍정 {direction[1]}, 부정 {direction[-1]}")
     print(f"  기준 지표와 반대 방향 숫자가 섞인 공시: {mixed}건")
-    print(f"  변형: 말 바꾸기 {kinds['paraphrase']}, 숨긴 지시문 {kinds['injection']}, 사실 뒤집기 {kinds['fact_flip']} (전환·100% 넘는 증가는 뒤집지 않음)")
+    print(f"  변형: 원문 표 {kinds['raw_table']}, 말 바꾸기 {kinds['paraphrase']}, 숨긴 지시문 {kinds['injection']}, 사실 뒤집기 {kinds['fact_flip']} (전환·100% 넘는 증가는 뒤집지 않음)")
     print(f"  모델에 넣을 입력 {n_inputs}개. 모델 4개 × {cfg['panel']['n_runs']}회면 호출 {n_inputs * 4 * cfg['panel']['n_runs']}회")
     if remarks:
         print("\n알아 둘 것:\n" + "\n".join(remarks))

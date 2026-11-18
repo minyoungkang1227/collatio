@@ -220,3 +220,11 @@ def test_perturbations_that_were_not_sent_are_not_scored(tmp_path):
     assert isinstance(report["H3_co_flip"]["paraphrase"], str)
     assert isinstance(report["H3_co_flip"]["source_swap"], dict)
     assert isinstance(report["H4_guard_eval_original"]["G3_probe"], str)
+
+
+def test_sending_only_some_kinds_still_analyzes(tmp_path):
+    cfg = yaml.safe_load((ROOT / "config" / "experiment.yaml").read_text(encoding="utf-8"))
+    items, written, clients = make_world(seed=2, n_items=40)
+    r = pipeline.run(items, written, clients, cfg, tmp_path / "runs.jsonl", kinds=["original", "raw_table"])
+    assert r["raw_table"]["n_items"] == 40 and r["injection"] == "이 변형을 보내지 않음"
+    assert set(r["raw_table"]["panel_value"]["accuracy_by_model"]) == {c.name for c in clients}

@@ -166,3 +166,19 @@ def parse(xml: str, rcept_no: str, item_id: str, company: str = "") -> Parsed:
         return Parsed(Disclosure(**data), notes, problems)
     except ValueError as e:
         return Parsed(None, notes, problems + [f"읽은 값이 형식에 맞지 않는다: {str(e)[:120]}"])
+
+
+def raw_text(xml: str, rcept_no: str, company: str) -> str:
+    """공시 원문의 표를 정리하지 않고 그대로 글로 옮긴다. 모델이 깔끔한 요약 대신 원문을 받았을 때를 보기 위한 입력이다.
+
+    문서의 처음부터 '2. 정보제공내역' 앞까지의 모든 줄을 쓴다. 정정 공시면 정정 전·후를 적은 줄도 들어간다.
+    칸은 ' | '로 잇는다. 숫자를 고르거나 설명을 붙이지 않는다. 연락처와 안내 문구는 판단과 무관해 뺀다.
+    """
+    lines = []
+    for row in rows_of(xml):
+        if row[0].startswith("2. 정보제공내역"):
+            break
+        lines.append(" | ".join(row))
+    day = f"{rcept_no[:4]}년 {int(rcept_no[4:6])}월 {int(rcept_no[6:8])}일"
+    head = f"{company}이(가) {day}에 낸 영업(잠정)실적 공시의 표를 그대로 옮긴 것이다. 칸은 ' | '로 구분했다."
+    return head + "\n" + "\n".join(lines)

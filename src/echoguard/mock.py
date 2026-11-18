@@ -67,8 +67,8 @@ def make_world(seed: int = 0, n_items: int = 100):
         return it.model_copy(update={"label_method": "rule", "op_yoy_pct": 20.0 * it.direction_text, "op_turn": "없음"})
 
     items = [with_figure(one(i)) for i in range(n_items)]
-    written = {(it.item_id, kind): f"{it.summary} ({kind})" for it in items for kind in ("paraphrase", "ai_style", "fact_flip", "injection")}
-    kinds = ("original", "source_swap", "paraphrase", "ai_style", "fact_flip", "fake_corroboration", "injection")
+    written = {(it.item_id, kind): f"{it.summary} ({kind})" for it in items for kind in ("paraphrase", "ai_style", "fact_flip", "injection", "raw_table")}
+    kinds = ("original", "source_swap", "paraphrase", "ai_style", "fact_flip", "fake_corroboration", "injection", "raw_table")
 
     def wrong_of(d: int) -> int:
         return 1 if d <= 0 else -1

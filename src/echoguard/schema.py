@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-Perturbation = Literal["original", "paraphrase", "fact_flip", "ai_style", "source_swap", "fake_corroboration", "injection"]
+Perturbation = Literal["original", "paraphrase", "fact_flip", "ai_style", "source_swap", "fake_corroboration", "injection", "raw_table"]
 
 
 # 모델이 방향 판단의 근거로 고를 수 있는 지표. 지시문(prompts/institutional_system.txt)의 목록과 같아야 한다
