@@ -109,6 +109,34 @@ SoK의 참고문헌 [169]가 이 논문이다. 2026-11-16에 찾았다.
 - "Models that Miss Together: Dependence-Aware Conformal Routing for Language Models" NeurIPS 2026 [검색 요약]: 여러 모델 중에서 고를 때 보증해야 할 사건은 "고른 모델이 전부 동시에 틀리는 것"이고, 이는 묶음의 결합 성질이라 모델별 점수로는 안 된다. 우리 문제의식과 같다. 방법은 아직 확인하지 못했다.
 - "Mitigating LLM Hallucinations via Conformal Abstention" arXiv:2405.01563 [검색 요약]: 답을 보류하는 기준을 등각 예측으로 정해 오류율을 보증한다. 가드 임계값을 정하는 방법의 후보다([experiment_spec.md](experiment_spec.md) 8장).
 
+### 2026-11-18 추가 [전부 검색 결과의 요약만 봄. 인용하기 전에 원문을 읽어야 한다]
+
+**우리 측정과 같은 질문을 한 연구**
+
+- "Nine Judges, Two Effective Votes: Correlated Errors Undermine LLM Evaluation Panels" — arXiv:2605.29800, NeurIPS 2026. 7개 계열의 모델 9개로 만든 평가 패널이 독립된 표로는 2개 남짓의 값어치밖에 없다고 보고했다. 유효 표본 수(Kish)와 "독립이었다면 나왔을 정확도"(콩도르세 귀무 모형)를 쓴다. 가장 잘하는 모델 하나가 패널 전체와 같거나 낫다고 한다. 우리의 유효 모델 수와 같은 생각이다. 차이: 그쪽은 자연어 추론 과제이고 방어 수단은 다루지 않는다. 우리가 따올 것: 독립 가정에서의 기대 정확도와 실제 정확도의 차이를 함께 보고하는 것, 가장 잘하는 모델 하나와 패널을 비교하는 것.
+- "Consensus is Not Verification: Why Crowd Wisdom Strategies Fail for LLM Truthfulness" — arXiv:2603.06612. 여러 번 물어 합치는 방법이 참을 가려내지 못하는 이유를 오답의 상관에서 찾는다. 모델이 스스로 말한 확신도는 맞고 틀림을 가르지 못한다고 한다. G1(답의 일치)만으로는 모자란다는 우리 주장의 근거가 된다.
+- Lefort 외, "Examining Independence in Ensemble Sentiment Analysis … Using the Condorcet Jury Theorem" — arXiv:2409.00094. 금융 감성 분석에서 다수결이 독립 가정만큼 좋아지지 않는다는 것을 보였다. 금융 글을 대상으로 한 가장 가까운 선행 사례다.
+
+**근거 대조(G6)의 한계에 관한 연구**
+
+- Turpin 외 (2023), "Language Models Don't Always Say What They Think" — arXiv:2305.04388. 모델이 적은 풀이 과정이 실제 판단과 어긋날 수 있음을 보였다.
+- Agarwal 외 (2024), "Faithfulness vs. Plausibility" — arXiv:2402.04614. 그럴듯한 설명과 충실한 설명은 다르다.
+- Freedman (2026), "Superficial Beliefs in LLM Decision-Making" — arXiv:2606.11016. 모델에게 가장 중요했던 속성을 물어 얻은 답이, 행동에서 드러난 속성과 어긋난다고 한다.
+
+G6에 주는 뜻: 모델이 "영업이익 전년 동기 대비를 봤다"고 적어도 실제로 그것을 보고 답했다는 보장은 없다. G6가 확인하는 것은 근거의 진실성이 아니라, 적은 근거가 글과 지침에 맞는가다. 문서에 이렇게 한정해서 적어 두었다. 보완하려면 기준 지표의 값만 바꾼 글을 다시 넣어 답이 따라 바뀌는지 보는 시험이 필요하다. 사실 뒤집기 변형이 이미 그 역할을 일부 한다.
+
+**운영 장치의 근거**
+
+- Chen, Zaharia, Zou (2023), "How Is ChatGPT's Behavior Changing over Time?" — arXiv:2307.09009, Harvard Data Science Review 2024. 같은 이름의 모델이 몇 달 사이에 과제별로 크게 달라졌다. `drift.py`의 근거.
+- Wang & Wang (2025), 금융·회계 연구에서 LLM 출력의 재현성 — arXiv:2503.16974. 같은 입력을 50번씩 돌려 일관성을 쟀다. 반복 간 흔들림의 기준값을 정할 때 참고한다.
+- 숨긴 지시문: BIPIA(문서에 숨긴 지시문의 첫 벤치마크), "How Vulnerable Are AI Agents to Indirect Prompt Injections?" — arXiv:2603.15714 (모델 13개, 공격 시도 27만 건의 공개 대회), Taktile PIBench(대출 심사 에이전트 대상, 2026-06). 우리 `injection` 변형은 문장 하나뿐이라 이들에 비해 매우 약한 시험이다.
+- FinVerBench — arXiv:2605.29586. 재무제표의 숫자가 서로 맞는지 모델이 가려내는지 본다. 우리 G0는 같은 일을 모델이 아니라 코드로 한다.
+
+**이 문헌들이 드러낸 우리 설계의 빈틈**
+
+- 패널이 가장 잘하는 모델 하나보다 나은지 비교하지 않는다. 낫지 않다면 "여러 모델을 쓴다"는 전제가 흔들린다.
+- 독립이었다면 나왔을 정확도와 실제의 차이를 보고하지 않는다.
+
 ## 5. 우리가 하지 않는 것
 
 탈옥, 프롬프트 주입, 도구 권한 탈취, 사기탐지 모델 오염은 다루지 않는다. 기관과 연구팀이 이미 깊게 하고 있고, 혼자서 더할 것이 적다. 이 프로젝트는 **판단이 함께 틀리는 문제**에 머문다.
