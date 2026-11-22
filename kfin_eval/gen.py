@@ -3,6 +3,7 @@
 - disclosure: EchoGuard의 공시 요약기(render, render_alt)와 방향 규칙(direction_of). 숫자는 가상.
 - dart:       같은 방식이되 실제 전자공시 숫자(EchoGuard가 만든 disclosures.csv)를 쓴다.
 - shocklens:  ShockLens의 리스크 엔진(basket_shock, scenario_losses, reverse.solve). 숫자는 가상.
+- els:        이 파일의 els_payoff. 다른 저장소가 필요 없다. 상품은 가상.
 
 난도를 1~4단으로 나눠 만든다. 모델이 어디서부터 틀리는지는 실제로 돌려 봐야 알 수 있으므로,
 한 난도를 짐작해 고르지 않고 사다리를 통째로 만든 뒤 calibrate로 쓸 만한 단을 고른다.
@@ -10,6 +11,7 @@
   공시     1 지표가 모두 같은 방향 / 2 다른 지표가 반대 방향 / 3 2를 다른 순서·다른 말로 / 4 2에 숨은 지시문(인젝션)
            5 글의 숫자로 한 단계 계산(판단 규칙을 알려주지 않는다) / 6 증감률에서 과거 금액을 거꾸로 계산  ← 5·6은 실제 공시만
   리스크   1 자산 2개·팩터 1개 / 2 자산 3개·팩터 2개 / 3 자산 5개·팩터 3개·고유충격 / 4 역스트레스테스트
+  상품     스텝다운 ELS 상환금액. 1 조기상환 / 2 두 자산 중 낮은 쪽 / 3 미상환·낙인 없음 / 4 낙인 발생
 """
 import csv
 import datetime
@@ -245,4 +247,102 @@ def shocklens_items(n, seed):
     return items
 
 
-GENERATORS = {"disclosure": disclosure_items, "shocklens": shocklens_items}
+def els_payoff(principal, coupon, barriers, ki, obs, lows):
+    """스텝다운 ELS의 상환금액. (금액, 상환 차수, 유형)을 돌려준다.
+
+    obs   기초자산별 평가일 수준 목록(최초 기준가 대비 %). 평가는 가장 낮은 자산으로 한다(worst-of)
+    lows  기초자산별 투자 기간 중 최저 수준(%). 평가일 사이의 저점을 포함한다
+    유형  redeem 조건 충족 상환 / dummy 미상환·낙인 없음 / loss 미상환·낙인 발생
+    """
+    n = len(barriers)
+    for i in range(n):
+        if min(o[i] for o in obs) >= barriers[i]:
+            return principal * (1 + coupon / 100 * 0.5 * (i + 1)), i + 1, "redeem"
+    if min(lows) >= ki:
+        return principal * (1 + coupon / 100 * 0.5 * n), n, "dummy"
+    return principal * min(o[-1] for o in obs) / 100, n, "loss"
+
+
+def _els_case(rng, level):
+    """난도에 맞는 조건과 경로를 만든다. 의도한 결과가 나오는 경로만 쓴다."""
+    barriers = rng.choice([[90, 90, 85, 85, 80, 75], [95, 90, 90, 85, 85, 80], [85, 85, 80, 80, 75, 70]])
+    ki, coupon, principal = rng.choice([45, 50, 55]), rng.choice([5.2, 6.4, 7.8, 9.0]), rng.choice([1000, 2000, 3000, 5000])
+    two = level >= 2
+    if level == 1:
+        want, k = "redeem", rng.choice([1, 2])
+    elif level == 2:
+        want, k = "redeem", rng.choice([3, 4, 5])
+    elif level == 3:
+        want, k = "dummy", 6
+    else:
+        want, k = rng.choice([("loss", 6), ("redeem", rng.choice([5, 6]))])
+    knocked = level == 4
+    a = []
+    for i, b in enumerate(barriers, 1):
+        if want == "redeem" and i == k:
+            a.append(b + rng.choice([0, 0, 1, 3, 6]))          # 기준과 정확히 같은 경우도 넣는다('이상')
+        elif want == "redeem" and i > k:
+            a.append(rng.randint(60, 110))                     # 상환 뒤의 수준은 결과와 무관하다
+        else:
+            a.append(b - rng.randint(1, 14))
+    obs = [a]
+    if two:
+        bseq = [b + rng.randint(2, 22) for b in barriers]      # 둘째 자산은 늘 기준 위
+        early = [i for i in range(len(barriers)) if i + 1 < k]
+        if early:                                              # 한 번은 서로 엇갈리게: 첫째는 기준 위, 둘째는 기준 아래
+            j = rng.choice(early)
+            a[j], bseq[j] = barriers[j] + rng.randint(1, 5), barriers[j] - rng.randint(2, 9)
+        obs.append(bseq)
+    lows = [min(o) - rng.randint(0, 3) for o in obs]
+    if knocked:
+        lows[rng.randrange(len(lows))] = ki - rng.randint(1, 8)   # 평가일에는 안 보이는 저점에서 낙인
+    lows = [min(l, min(o)) for l, o in zip(lows, obs)]
+    if not knocked and min(lows) < ki:
+        return None
+    amount, when, kind = els_payoff(principal, coupon, barriers, ki, obs, lows)
+    if kind != want or (want == "redeem" and when != k):
+        return None
+    variant = {1: "els_early", 2: "els_worst_of", 3: "els_no_knock_in"}.get(level) or ("els_loss" if kind == "loss" else "els_knock_in_but_redeemed")
+    return dict(barriers=barriers, ki=ki, coupon=coupon, principal=principal, obs=obs, lows=lows, amount=amount, variant=variant)
+
+
+def els_items(n, seed):
+    """상품 문항: 스텝다운 ELS의 조건과 지수 경로를 주고 상환금액을 묻는다. 난도 1~4를 고르게 섞는다.
+
+    1 자산 1개, 1·2차 조기상환 / 2 자산 2개(낮은 쪽 기준), 3~5차 상환 / 3 끝까지 미상환·낙인 없음
+    4 낙인 발생: 만기 손실이거나, 낙인이 있었지만 뒤에 조건을 채워 상환
+    """
+    rng, items, k = random.Random(seed), [], 0
+    names = ["A지수", "B지수"]
+    while len(items) < n:
+        k += 1
+        level = len(items) % 4 + 1
+        c = _els_case(rng, level)
+        if c is None:
+            continue
+        m = len(c["obs"])
+        under = names[0] if m == 1 else f"{names[0]}, {names[1]} (평가는 두 자산 가운데 최초 기준가 대비 수준이 더 낮은 쪽으로 한다)"
+        q = (f"다음 조건의 스텝다운형 ELS에 {c['principal']:,}만원을 투자했다.\n"
+             f"- 기초자산: {under}\n"
+             "- 만기 3년. 6개월마다 평가한다(1~6차). 6차가 만기 평가다.\n"
+             "- 상환 조건: 평가일의 평가 수준이 그 차수의 상환 기준 이상이면 그날 상환하고 상품이 끝난다. "
+             f"상환 기준(1~6차, 최초 기준가 대비 %): {', '.join(str(b) for b in c['barriers'])}\n"
+             f"- 상환금액: 원금 × (1 + 연 {c['coupon']}% × 경과 연수). 경과 연수는 차수 × 0.5년이다.\n"
+             f"- 6차까지 상환되지 않은 경우: 투자 기간 중 어느 기초자산도 최초 기준가의 {c['ki']}% 미만으로 내려간 적이 없으면 "
+             f"원금 × (1 + 연 {c['coupon']}% × 3년)을 지급한다. 한 번이라도 내려간 적이 있으면 원금 × (6차 평가 수준 ÷ 100)을 지급한다.\n"
+             "- 평가일 수준(1~6차, 최초 기준가 대비 %): "
+             + "; ".join(f"{names[u]} {', '.join(str(x) for x in c['obs'][u])}" for u in range(m)) + "\n"
+             "- 투자 기간 중 최저 수준(평가일 사이 포함, %): " + ", ".join(f"{names[u]} {c['lows'][u]}" for u in range(m)) + "\n"
+             "물음: 투자자가 받는 상환금액을 만원 단위로 소수 첫째 자리까지 구하라.")
+        items.append({
+            "id": f"els-s{seed}-{k:03d}", "domain": "product", "answer_type": "numeric", "difficulty": level,
+            "author": "gen-els", "answer_source": "engine", "question": q,
+            "answer": {"value": round(c["amount"], 4), "unit": "만원", "rel_tol": 0.001},
+            "sources": [{"title": "가상 상품. 정답은 kfin-eval gen.els_payoff 로 계산", "as_of": _today()}],
+            "meta": {"level": level, "variant": c["variant"]},
+        })
+    return items
+
+
+GENERATORS = {"disclosure": disclosure_items, "shocklens": shocklens_items, "els": els_items}
+

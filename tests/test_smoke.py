@@ -31,6 +31,41 @@ class Smoke(unittest.TestCase):
         for iid, (err, _) in validate_all(self.items).items():
             self.assertEqual(err, [], iid)
 
+    def test_els(self):
+        from kfin_eval.gen import els_payoff, els_items
+        B = [90, 90, 85, 85, 80, 75]
+        # 1차에 기준 이상 → 6개월치 이자와 함께 상환
+        self.assertEqual(els_payoff(1000, 6.4, B, 50, [[92, 70, 70, 70, 70, 70]], [60]), (1032.0, 1, "redeem"))
+        # 기준과 정확히 같아도 상환('이상'). 3차 상환이면 1.5년치
+        self.assertEqual(els_payoff(2000, 8.0, B, 50, [[80, 80, 85, 60, 60, 60]], [79]), (2240.0, 3, "redeem"))
+        # 두 자산 중 낮은 쪽으로 평가: 첫째만 기준을 넘으면 상환되지 않는다
+        self.assertEqual(els_payoff(1000, 6.0, B, 50, [[95, 95, 95, 95, 95, 95], [80, 80, 80, 86, 70, 70]], [90, 65])[1], 4)
+        # 끝까지 미상환, 낙인 없음 → 3년치 이자
+        amt, when, kind = els_payoff(3000, 5.2, B, 50, [[80, 80, 80, 80, 70, 70]], [55])
+        self.assertEqual((round(amt, 6), when, kind), (3468.0, 6, "dummy"))
+        # 끝까지 미상환, 평가일 사이 저점에서 낙인 → 6차 수준만큼만 돌려받는다
+        self.assertEqual(els_payoff(3000, 5.2, B, 50, [[80, 80, 80, 80, 70, 62]], [48]), (1860.0, 6, "loss"))
+        # 낙인이 있었어도 뒤에 조건을 채우면 이자와 함께 상환된다
+        self.assertEqual(els_payoff(1000, 6.0, B, 50, [[60, 60, 60, 60, 82, 70]], [45]), (1150.0, 5, "redeem"))
+        items = els_items(24, 5)
+        for iid, (err, _) in validate_all(items).items():
+            self.assertEqual(err, [], iid)
+        self.assertEqual({i["meta"]["level"] for i in items}, {1, 2, 3, 4})
+        kinds = {i["meta"]["variant"] for i in items}
+        self.assertTrue({"els_early", "els_worst_of", "els_no_knock_in", "els_loss", "els_knock_in_but_redeemed"} <= kinds, kinds)
+        self.assertEqual([i["answer"]["value"] for i in els_items(24, 5)], [i["answer"]["value"] for i in items])   # 같은 시드면 같은 문항
+        # 문항의 숫자만으로 다시 계산해도 정답이 나온다(문항에 필요한 정보가 다 들어 있는지 확인)
+        import re
+        for it in items:
+            q = it["question"]
+            principal = int(re.search(r"ELS에 ([\d,]+)만원", q).group(1).replace(",", ""))
+            barriers = [int(x) for x in re.search(r"최초 기준가 대비 %\): ([\d, ]+)\n- 상환금액", q).group(1).split(", ")]
+            coupon = float(re.search(r"연 ([\d.]+)% × 경과", q).group(1))
+            ki = int(re.search(r"최초 기준가의 (\d+)% 미만", q).group(1))
+            obs = [[int(x) for x in s.split(", ")] for s in re.findall(r"[AB]지수 ((?:\d+, ){5}\d+)", q)]
+            lows = [int(x) for x in re.findall(r"[AB]지수 (\d+)", q.split("최저 수준")[1])]
+            self.assertAlmostEqual(els_payoff(principal, coupon, barriers, ki, obs, lows)[0], it["answer"]["value"], places=3, msg=it["id"])
+
     def test_number_formats(self):
         from kfin_eval import grade, probe
         it = {"answer_type": "numeric", "answer": {"value": 1467300.0, "unit": "억원", "rel_tol": 0.01}}

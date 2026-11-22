@@ -84,6 +84,9 @@ def _eligible(p, include_draft):
 
 def cmd_run(p, a):
     items = _eligible(p, a.include_draft)
+    if getattr(a, "authors", None):   # 일부 생성기의 문항만 돌린다. 이미 돌린 문항에 돈을 두 번 쓰지 않기 위해서다
+        want = {x.strip() for x in a.authors.split(",")}
+        items = [i for i in items if i["author"] in want]
     if not items:
         raise SystemExit("실행할 문항이 없습니다. 검수 승인 2건이 필요합니다(시험 삼아 돌리려면 --include-draft).")
     run_id = a.run_id or datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -235,7 +238,7 @@ def cmd_pipeline(p, a):
     if cmd_validate(p, ns()):
         raise SystemExit("문항 오류부터 고치세요.")
     run_id = a.run_id or datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    cmd_run(p, ns(models=a.models, include_draft=a.include_draft, run_id=run_id))
+    cmd_run(p, ns(models=a.models, include_draft=a.include_draft, run_id=run_id, authors=a.authors))
     cmd_grade(p, ns(run_id=run_id, judge=a.judge))
     cmd_failures(p, ns(run_id=run_id, threshold=1.0))
     cmd_report(p, ns(run_id=run_id))
@@ -348,6 +351,7 @@ def main(argv=None):
     r.add_argument("--models", required=True, help="쉼표 구분. 예: claude-fable-5-2,mock-perfect")
     r.add_argument("--include-draft", action="store_true", help="미승인 문항도 포함(시험용)")
     r.add_argument("--run-id")
+    r.add_argument("--authors", help="이 생성기·작성자의 문항만. 예: gen-els,gen-shocklens")
     r = sub.add_parser("grade", help="응답 채점")
     r.add_argument("--run-id", required=True)
     r.add_argument("--judge", help="서술형 LLM 채점자 모델(생략 시 키워드 채점)")
@@ -377,6 +381,7 @@ def main(argv=None):
     r = sub.add_parser("pipeline", help="검사부터 점수표·가드 점검까지 한 번에")
     r.add_argument("--models", required=True, help="예: eg:all 또는 eg:claude-haiku,eg:gpt-luna")
     r.add_argument("--run-id")
+    r.add_argument("--authors", help="이 생성기·작성자의 문항만. 예: gen-els,gen-shocklens")
     r.add_argument("--include-draft", action="store_true")
     r.add_argument("--judge")
     r = sub.add_parser("probe-make", help="오답을 심은 검토 묶음 만들기")
