@@ -1,56 +1,39 @@
 # EchoGuard
 
-AI가 낸 답을 사람이나 다음 시스템으로 넘기기 전에 거르는 필터. 여러 AI가 같은 금융 문서에 **다 같이 틀리는 순간**을 재고, 의심스러운 답을 사람에게 넘긴다.
+금융회사가 AI에 문서를 읽힐 때, 틀린 답이 그대로 쓰이지 않게 거르는 장치와 그것을 시험한 기록.
 
-A filter and black-box stress test for correlated errors across LLMs on Korean financial text.
+A filter for LLM readings of Korean financial disclosures, and the experiments that reshaped it.
 
-> 상태 (2026-11-18): 필터와 실험 틀이 모의 모델로 끝까지 돈다. 실제 모델로 돌린 것은 두 가지뿐이다. 공시 10건 시범 실행(원문 오답 0건이라 설계를 바꿨다)과 오늘의 뉴스 4건 판정 두 차례(기사 본문 수집이 대부분 실패했다). 세 번의 시범 실행에서 모델은 원문을 한 번도 틀리게 읽지 않았고, 조작된 글은 거의 전부 그대로 믿었다. 그래서 방어의 무게를 모델의 답을 대조하는 쪽에서 입력을 원문과 대조하는 쪽으로 옮겼다. 기록은 [docs/pilot_log.md](docs/pilot_log.md).
+> 상태 (2026-11-22): 탐색용 실험 세 번을 마쳤다. 사전에 정한 본 실행은 하지 않았다.
 
-## 방향
+## 한 줄 결과
 
-목적은 방어다. 본체는 가드이고, 측정은 가드가 실제로 잡는지 확인하는 수단이다. 답을 고치지 않는다. 걸러서 사람에게 넘긴다. 다루는 문제의 목록은 [docs/problem_register.md](docs/problem_register.md), 운영 쪽 위험은 [docs/operations.md](docs/operations.md).
+**여러 AI는 함께 틀리지 않았다. 대신 함께 속았다.**
 
-## 쓰는 법
-
-```
-python -m echoguard.filter --mock                                              # 지어낸 답으로 판정 과정 보기
-python -m echoguard.filter --numbers data/examples/disclosure_example.json     # 공시 숫자 한 건을 실제 모델에 묻고 판정
-```
-
-잠정실적 공시의 숫자를 넣으면 요약을 만들어 모델 패널에 묻고, 답을 걸러 통과 또는 검토로 판정한다.
-필터가 보는 것: 입력의 모순(G0), 답의 일치(G1), 말을 바꿔도 같은가(G3), 출처(G4b), 근거(G6). 하나라도 걸리면 검토다. 판정과 사람의 검토 결과는 기록에 남는다. 자세한 것은 [docs/filter.md](docs/filter.md).
-
-EchoGuard는 다른 프로젝트 없이 혼자 돈다. `integrations/` 폴더의 ShockLens 연동은 시험 삼아 붙여 본 선택 기능이고, 본체와 실험은 그것에 기대지 않는다.
-
-## 왜 만드나
-
-금융당국은 금융회사들이 비슷한 AI를 쓰면 판단이 한쪽으로 쏠릴 수 있다고 경고한다. 그런데 그 쏠림을 어떤 데이터로 어떻게 잴지는 정해진 게 없고, 제안된 지표들은 각 회사의 비공개 모델 내부를 봐야 계산할 수 있다.
-
-EchoGuard는 모델 내부를 보지 않는다. 같은 뉴스를 여러 모델에 넣고 출력만 비교한다. 모델들이 일치하는 것 자체는 문제가 아니다. 틀린 답에 일치하는 것이 문제이고, 이 프로젝트가 재는 것도 그것이다.
-
-## 두 트랙
-
-| 트랙 | 상황 | 모델에 묻는 것 |
+| 입력 | 답 수 | 결과 |
 |---|---|---|
-| 기관 | 금융사가 뉴스를 AI로 해석 | 사건 강도(1~5)와 방향 |
-| 개인 | 일반 투자자가 챗봇에 질문 | 매수·보유·매도·판단 안 함 |
+| 공시 원문 그대로 (요약 두 가지, 원문 표) | 600 | 오답 0 |
+| 숫자를 뒤집은 글 | 560 | 546개가 글대로 답함 |
 
-## 구조
+공시 10건, 모델 4개(GPT 2, Claude 2), 판단 기준을 적어 준 과제 하나에서의 결과다. 자세한 내용과 말할 수 없는 것은 [docs/findings.md](docs/findings.md).
+
+## 그래서 무엇을 만들었나
+
+처음에는 여러 모델의 답을 서로 대조하려 했다. 실험에서 그 방법은 조작된 글을 하나도 잡지 못했다. 모델들이 틀린 글을 똑같이 정확하게 읽었기 때문이다. 그래서 무게를 입력 쪽으로 옮겼다.
 
 ```
-한국어 금융 뉴스 (정답 라벨 수기 작성)
-   → 변형기: 원본 / 문체만 바꿈 / 사실 뒤집음 / AI 문체 / 출처 표기 바꿈 / 여러 건 보도로 꾸밈
-   → 모델 패널: LLM 여러 개 × 반복 호출
-   → 측정 엔진 (LLM 없음)
-        ① 모델 내 분산
-        ② 모델 간 일치도 (순서형 Krippendorff α)
-        ③ 상관 오류: 일치했는데 틀린 비율
-        ④ 동반 뒤집힘: 변형 시 같은 방향으로 바뀐 비율
-   → 환산: 모델별 출력이 만드는 ES 차이
-   → 가드: 일치도 / 출처 표기 / 변형 탐침 / 독립 출처 대조 / 학습 가드 → 통과·검토
+받은 숫자 → G0 숫자끼리 앞뒤가 맞는가 → G4c 전자공시 원문과 같은가 → 모델 패널 → G1·G6 답과 근거 → 통과 / 검토
 ```
 
-코드 구조는 [docs/architecture.md](docs/architecture.md), 연구 설계는 [docs/design.md](docs/design.md), 학습하는 가드는 [docs/learned_guard.md](docs/learned_guard.md), 선행연구와의 차이는 [docs/related_work.md](docs/related_work.md), 가설과 분석 방법은 [docs/experiment_spec.md](docs/experiment_spec.md), 라벨 기준은 [docs/labeling_guide.md](docs/labeling_guide.md).
+- 공시 원문은 사람도 AI도 옮기지 않고 코드가 읽는다 (`src/echoguard/dart.py`, 실제 공시 50건 중 47건을 읽음).
+- 하나라도 걸리면 사람에게 넘긴다. 답을 고치지 않는다.
+- 판정과 사람의 검토 결과는 기록에 남는다 (`src/echoguard/audit.py`).
+
+필터 사용법은 [docs/filter.md](docs/filter.md), 운영 쪽 위험(모델 변경, 공급사 장애, 숨긴 지시문)은 [docs/operations.md](docs/operations.md), 다루는 문제의 지도는 [docs/problem_register.md](docs/problem_register.md).
+
+## 문서
+
+결과 [docs/findings.md](docs/findings.md) · 실험 기록 [docs/pilot_log.md](docs/pilot_log.md) · 가설과 분석 방법 [docs/experiment_spec.md](docs/experiment_spec.md) · 선행연구 [docs/related_work.md](docs/related_work.md) · 코드 구조 [docs/architecture.md](docs/architecture.md)
 
 ## 실행
 
@@ -61,13 +44,11 @@ PYTHONPATH=src python -m echoguard.pipeline --mock   # 모의 모델로 전체 �
 PYTHONPATH=src python -m echoguard.filter --mock     # 필터: 문서 한 건을 통과/검토로 판정하는 예시
 PYTHONPATH=src python -m echoguard.drift 예전.jsonl 지금.jsonl   # 모델이 바뀌었는지 점검
 PYTHONPATH=src python -m echoguard.check             # 실제 모델 시험 호출 (API 키 필요)
+python scripts/fetch_disclosures.py 10 && python scripts/dart_to_labels.py 10   # 공시 원문을 받아 코드로 읽기 (DART_API_KEY 필요)
+python scripts/check_against_dart.py                 # 받은 숫자를 전자공시 원문과 대조
 ```
 
 API 키 준비는 [docs/setup.md](docs/setup.md), 뉴스 라벨링 순서는 [docs/labeling_guide.md](docs/labeling_guide.md).
-
-## 다른 프로젝트에 적용
-
-같은 측정을 지경학 뉴스 해석 에이전트 [ShockLens](https://github.com/minyoungkang1227/shocklens)에 적용한다. 방법과 한계는 [docs/shocklens_check.md](docs/shocklens_check.md).
 
 ## 내 데이터로 돌려 보기, 의견 보내기
 
@@ -77,6 +58,8 @@ API 키 준비는 [docs/setup.md](docs/setup.md), 뉴스 라벨링 순서는 [do
 
 ## 한계
 
-- 모델 5~7개 패널의 결과다. 시장 전체에 대한 주장이 아니다.
-- 변형 뉴스를 AI로 만들면 사람이 쓴 가짜뉴스와 문체가 다를 수 있다.
-- 정답 라벨은 한 사람이 붙인다. 라벨 근거를 열로 남겨 검토할 수 있게 한다.
+- 공시 10건, 모델 4개의 탐색용 결과다. 시장 전체나 다른 종류의 문서에 대한 주장이 아니다.
+- 모델이 틀리지 않아서, 오답의 상관을 재는 지표와 답을 대조하는 가드는 시험되지 못했다.
+- 원문 대조는 전자공시에 원문이 있는 글에만 쓸 수 있다.
+
+`integrations/`의 ShockLens 연동은 시험 삼아 붙여 본 선택 기능이고 본체는 그것에 기대지 않는다.
