@@ -8,7 +8,7 @@
 
 A filter for LLM readings of Korean financial disclosures, and the experiments that reshaped it.
 
-> 상태 (2026-11-22): 탐색용 실험 세 번을 마쳤다. 사전에 정한 본 실행은 하지 않았다.
+> 상태 (2026-11-22): 탐색용 실험 세 번과 원문 대조의 실제 확인을 마쳤다. 사전에 정한 본 실행은 하지 않았다. 여기서 일단락한다.
 
 ## 한 줄 결과
 
@@ -30,6 +30,7 @@ A filter for LLM readings of Korean financial disclosures, and the experiments t
 ```
 
 - 공시 원문은 사람도 AI도 옮기지 않고 코드가 읽는다 (`src/collatio/dart.py`, 실제 공시 50건 중 47건을 읽음).
+- 받은 숫자를 전자공시 원문과 맞춰 본다. 실제 전자공시에 대고 돌렸을 때 원문 그대로인 숫자 47개는 전부 통과했고, 부호만 바꾼 숫자 35개는 전부 걸렸다.
 - 하나라도 걸리면 사람에게 넘긴다. 답을 고치지 않는다.
 - 판정과 사람의 검토 결과는 기록에 남는다 (`src/collatio/audit.py`).
 
