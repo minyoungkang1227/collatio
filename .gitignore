@@ -1,0 +1,11 @@
+# 실행 결과와 임시 파일
+runs/
+__pycache__/
+*.pyc
+
+# 공개하지 않는 것: 비공개 문항, 선점 증명용 소금값, 검토 묶음의 정답, 모델 응답이 담긴 기록
+data/items/gen_*.jsonl
+data/private_salt.txt
+data/probes/
+data/*.jsonl
+data/*.md
