@@ -27,7 +27,7 @@ class Paths:
         self.envs, self.fail_report = r / "data" / "envs", r / "data" / "failure_report.md"
         self.probes, self.reviewer_scores = r / "data" / "probes", r / "data" / "reviewer_scores.jsonl"
         self.score_report = r / "data" / "contribution_scores.md"
-        self.data, self.dist = r / "data", r / "dist"
+        self.data, self.dist, self.root = r / "data", r / "dist", r
 
     def status(self, items):
         """검수 상태. 점검에서 신뢰 미달로 나온 검토자의 판정은 뺀다."""
@@ -207,7 +207,10 @@ def cmd_gen(p, a):
         out = p.items / f"gen_{a.source}_s{a.seed}.jsonl"
     if out.exists():
         raise SystemExit(f"이미 있음: {out} (다른 --seed를 쓰거나 파일을 지우세요)")
-    items = GEN.dart_items(a.file) if a.source == "dart" else GEN.GENERATORS[a.source](a.n, a.seed)
+    gens = {**GEN.GENERATORS, **GEN.load_plugins(p.root)}
+    if a.source != "dart" and a.source not in gens:
+        raise SystemExit(f"없는 생성기: {a.source}. 쓸 수 있는 것: dart, {', '.join(sorted(gens))}")
+    items = GEN.dart_items(a.file) if a.source == "dart" else gens[a.source](a.n, a.seed)
     if not items:
         raise SystemExit("만들 수 있는 문항이 없습니다.")
     for it in items:
@@ -242,13 +245,16 @@ def cmd_pipeline(p, a):
     cmd_grade(p, ns(run_id=run_id, judge=a.judge))
     cmd_failures(p, ns(run_id=run_id, threshold=1.0))
     cmd_report(p, ns(run_id=run_id))
-    if any(g for g in store.read_jsonl(p.runs / run_id / "grades.jsonl")
-           if (it := next((i for i in load_items(p.items) if i["id"] == g["item_id"]), {})).get("answer_source") == "engine"):
+    from . import bridges
+    engine = {i["id"] for i in load_items(p.items) if i.get("answer_source") == "engine"}
+    if any(g["item_id"] in engine for g in store.read_jsonl(p.runs / run_id / "grades.jsonl")):
         cmd_calibrate(p, ns(run_id=run_id))
-    if len(expand(a.models)) >= 2:
-        cmd_guard_check(p, ns(run_id=run_id, threshold=None))
-    else:
+    if len(expand(a.models)) < 2:
         print("모델이 1개라 가드 점검은 건너뜀")
+    elif not bridges.available()["echoguard"]:
+        print("Collatio 저장소가 없어 가드 점검은 건너뜀(점수표와 난도 보정은 그것 없이도 나온다)")
+    else:
+        cmd_guard_check(p, ns(run_id=run_id, threshold=None))
     print(f"결과 폴더: {p.runs / run_id}")
     return 0
 
@@ -371,7 +377,7 @@ def main(argv=None):
     r.add_argument("--agents", required=True, help="쉼표 구분. 예: mock-good,mock-bad,claude-fable-5-2")
     r.add_argument("--run-id")
     r = sub.add_parser("gen", help="엔진으로 문항 생성(정답을 코드가 계산)")
-    r.add_argument("--source", required=True, choices=sorted(GEN.GENERATORS) + ["dart"])
+    r.add_argument("--source", required=True, help="dart, disclosure, shocklens, els 또는 plugins/ 폴더의 생성기 이름")
     r.add_argument("--file", help="dart 전용: 실제 공시 숫자 CSV")
     r.add_argument("--n", type=int, default=20)
     r.add_argument("--seed", type=int, default=1)

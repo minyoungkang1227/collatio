@@ -51,8 +51,8 @@ def validate_item(item, today=None):
     if err:
         return err, warn
 
-    if item["domain"] not in DOMAINS:
-        err.append(f"domain은 {sorted(DOMAINS)} 중 하나")
+    if not isinstance(item["domain"], str) or not item["domain"].strip():
+        err.append("domain은 비어 있지 않은 문자열")   # 분야 이름은 자유다. DOMAINS는 지금까지 쓴 이름의 목록일 뿐이다
     if item["answer_type"] not in ANSWER_TYPES:
         err.append(f"answer_type은 {sorted(ANSWER_TYPES)} 중 하나")
     if not isinstance(item["difficulty"], int) or not 1 <= item["difficulty"] <= 6:

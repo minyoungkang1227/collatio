@@ -66,6 +66,25 @@ class Smoke(unittest.TestCase):
             lows = [int(x) for x in re.findall(r"[AB]지수 (\d+)", q.split("최저 수준")[1])]
             self.assertAlmostEqual(els_payoff(principal, coupon, barriers, ki, obs, lows)[0], it["answer"]["value"], places=3, msg=it["id"])
 
+    def test_plugins_and_free_domain(self):
+        import re
+        shutil.copytree(ROOT / "plugins", self.tmp / "plugins")
+        self.assertEqual(self.run_cli("gen", "--source", "units", "--n", "16", "--seed", "2"), 0)
+        with self.assertRaises(SystemExit):
+            self.run_cli("gen", "--source", "nope")
+        items = [i for i in load_items(self.tmp / "data" / "items") if i["author"] == "gen-units"]
+        self.assertEqual(len(items), 16)
+        for iid, (err, _) in validate_all(items).items():
+            self.assertEqual(err, [], iid)                      # 금융 밖 분야 이름도 통과한다
+        self.assertTrue({"manufacturing", "logistics", "energy", "health", "finance"} <= {i["domain"] for i in items})
+        for it in items:                                        # 문항의 숫자로 다시 계산
+            now = int(re.search(r"은 ([\d,]+)", it["question"]).group(1).replace(",", ""))
+            pct, way = re.search(r"보다 ([\d.]+)% (증가|감소)", it["question"]).groups()
+            prev = now / (1 + (1 if way == "증가" else -1) * float(pct) / 100) * it["meta"]["factor"]
+            self.assertAlmostEqual(prev, it["answer"]["value"], places=3, msg=it["id"])
+        self.assertEqual(self.run_cli("pipeline", "--models", "mock-perfect,mock-noisy", "--authors", "gen-units", "--run-id", "u1"), 0)
+        self.assertIn("변형별 정답률", (self.tmp / "runs" / "u1" / "calibration.md").read_text(encoding="utf-8"))
+
     def test_number_formats(self):
         from kfin_eval import grade, probe
         it = {"answer_type": "numeric", "answer": {"value": 1467300.0, "unit": "억원", "rel_tol": 0.01}}

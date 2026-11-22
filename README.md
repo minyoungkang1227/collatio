@@ -18,6 +18,7 @@
 | ShockLens | 계산한다. 리스크 수치 문항의 정답을 만든다 |
 
 이 문서에 EchoGuard라고 적힌 곳은 모두 Collatio를 가리킨다(2026-11-22에 이름을 바꿨다).
+세 저장소가 무엇을 주고받는지, 금융 밖의 분야를 어떻게 붙이는지는 [docs/architecture.md](docs/architecture.md)에 있다.
 
 ## 실행 기록
 

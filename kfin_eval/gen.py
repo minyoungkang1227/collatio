@@ -346,3 +346,16 @@ def els_items(n, seed):
 
 GENERATORS = {"disclosure": disclosure_items, "shocklens": shocklens_items, "els": els_items}
 
+
+def load_plugins(root):
+    """프로젝트의 plugins/*.py에서 GENERATORS를 모아 {이름: 함수}로 돌려준다. 새 분야는 여기에 파일 하나로 붙인다."""
+    import importlib.util
+    from pathlib import Path
+    found = {}
+    for f in sorted(Path(root, "plugins").glob("*.py")):
+        spec = importlib.util.spec_from_file_location(f"kfin_plugin_{f.stem}", f)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        found.update(getattr(mod, "GENERATORS", {}))
+    return found
+

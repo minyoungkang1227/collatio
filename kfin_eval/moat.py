@@ -50,6 +50,16 @@ def calibrate(items, grades):
         for (kind, name), by in sorted(inj.items()):
             lines.append(f"| {kind} | {name} | {max(len(v) for v in by.values())} | "
                          + " | ".join(f"{sum(by[m]) / len(by[m]):.0%}" if by.get(m) else "-" for m in models) + " |")
+    var = defaultdict(lambda: defaultdict(list))   # 같은 난도 안에서도 변형마다 다르다
+    for g in grades:
+        it = items.get(g["item_id"])
+        if it is not None:
+            var[(it["author"], it.get("meta", {}).get("variant", "-"))][g["model"]].append(g["score"])
+    if len(var) > 1:
+        lines += ["", "## 변형별 정답률", "", "| 생성기 | 변형 | 문항 수 | " + " | ".join(models) + " |", "|---|---|---|" + "---|" * len(models)]
+        for (author, v), by in sorted(var.items()):
+            lines.append(f"| {author} | {v} | {max(len(x) for x in by.values())} | "
+                         + " | ".join(f"{sum(by[m]) / len(by[m]):.0%}" if by.get(m) else "-" for m in models) + " |")
     keep = [f"{r['author']} {r['level']}단" for r in rows if BROKEN <= r["mean"] < EASY]
     lines += ["", "다음에 늘릴 단: " + (", ".join(keep) if keep else "없음. 모든 단이 너무 쉽거나 거의 다 틀린다."), ""]
     return rows, "\n".join(lines) + "\n"
