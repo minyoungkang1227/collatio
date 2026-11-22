@@ -65,3 +65,68 @@ def verify_dart(url: str, corp: str, key: str, get=None) -> SourceCheck:
         if page >= int(body.get("total_page", 1)):
             return SourceCheck(False, f"접수번호 {number}이 {day} 공시 목록에 없음")
         page += 1
+
+
+DOCUMENT_API = "https://opendart.fss.or.kr/api/document.xml"
+FIELDS = {
+    "unit": "단위", "period": "분기",
+    "revenue": "매출액", "revenue_yoy": "매출액 전년 동기 대비", "revenue_qoq": "매출액 전기 대비",
+    "op": "영업이익", "op_yoy": "영업이익 전년 동기 대비", "op_qoq": "영업이익 전기 대비",
+    "net": "순이익", "net_yoy": "순이익 전년 동기 대비",
+    "cum_op": "누계 영업이익", "cum_op_yoy": "누계 영업이익 전년 동기 대비",
+}
+
+
+def differences(claimed, original) -> list[str]:
+    """받은 숫자가 원문에서 읽은 숫자와 다른 곳. 비어 있으면 전부 같다.
+
+    글을 넘겨받은 쪽이 할 수 있는 가장 확실한 확인이다. 모델이 글을 얼마나 잘 읽는지와 무관하게,
+    글에 적힌 숫자가 원문과 다르면 여기서 드러난다.
+    """
+    out = []
+    for name, label in FIELDS.items():
+        a, b = getattr(claimed, name), getattr(original, name)
+        same = a == b if isinstance(a, str) or isinstance(b, str) or a is None or b is None else abs(a - b) < 1e-9
+        if not same:
+            out.append(f"{label}: 받은 값 {a}, 원문 {b}")
+    return out
+
+
+def fetch_original(rcept_no: str, key: str, get=None) -> str | None:
+    """전자공시에서 공시 원문을 받아 글로 돌려준다. 받지 못하면 None."""
+    import io
+    import zipfile
+
+    if get is None:
+        import requests
+
+        get = requests.get
+    r = get(DOCUMENT_API, params={"crtfc_key": key, "rcept_no": rcept_no}, timeout=30)
+    if not r.content.startswith(b"PK"):
+        return None
+    with zipfile.ZipFile(io.BytesIO(r.content)) as z:
+        names = [n for n in z.namelist() if n.lower().endswith(".xml")]
+        return z.read(names[0]).decode("utf-8", errors="replace") if names else None
+
+
+def verify_numbers(claimed, key: str, get=None) -> SourceCheck:
+    """받은 공시 숫자를 전자공시 원문과 대조한다(G4c).
+
+    verify_dart는 그런 공시가 있는지만 본다. 이것은 원문을 받아 코드로 읽고 숫자를 하나씩 맞춰 본다.
+    공시 주소만 진짜이고 숫자가 바뀐 글은 verify_dart를 지나가지만 여기서 걸린다.
+    """
+    from . import dart
+
+    number = receipt_no(claimed.url)
+    if number is None:
+        return SourceCheck(False, "전자공시 주소가 아니거나 접수번호가 없어 원문과 대조할 수 없음")
+    xml = fetch_original(number, key, get)
+    if xml is None:
+        return SourceCheck(False, f"전자공시에서 원문({number})을 받지 못함")
+    parsed = dart.parse(xml, number, claimed.item_id, claimed.corp)
+    if parsed.disclosure is None:
+        return SourceCheck(False, "원문의 표를 읽지 못해 대조할 수 없음: " + "; ".join(parsed.problems)[:120])
+    found = differences(claimed, parsed.disclosure)
+    if found:
+        return SourceCheck(False, "원문과 다른 숫자 → " + "; ".join(found))
+    return SourceCheck(True, f"원문과 숫자 {len(FIELDS)}항목이 전부 같음")

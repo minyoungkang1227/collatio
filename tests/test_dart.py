@@ -39,3 +39,31 @@ def test_loss_to_loss_operating_profit_and_corrections():
 def test_unreadable_document_gives_a_reason_not_a_guess():
     p = dart.parse("<DOCUMENT><BODY><P>표가 없는 문서</P></BODY></DOCUMENT>", "20261020900123", "d001", "가나전자")
     assert p.disclosure is None and p.problems
+
+
+def test_numbers_are_checked_against_the_original_document():
+    import io
+    import zipfile
+
+    from echoguard.disclosure import flipped
+    from echoguard.source import differences, verify_numbers
+
+    xml = (FIX / "dart_ok.xml").read_text(encoding="utf-8")
+    original = read("dart_ok.xml").disclosure.model_copy(update={"url": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20261020900123"})
+
+    class Reply:
+        def __init__(self, content):
+            self.content = content
+
+    def get(url, params, timeout):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            z.writestr("20261020900123.xml", xml)
+        return Reply(buf.getvalue())
+
+    assert verify_numbers(original, "k", get).verified
+    fake = flipped(original)                                   # 주소는 진짜, 영업이익 증감의 부호만 바꾼 글
+    check = verify_numbers(fake, "k", get)
+    assert not check.verified and "영업이익 전년 동기 대비" in check.detail
+    assert differences(original.model_copy(update={"unit": "억원"}), original) == ["단위: 받은 값 억원, 원문 백만원"]
+    assert not verify_numbers(original, "k", lambda url, params, timeout: Reply(b"<error/>")).verified

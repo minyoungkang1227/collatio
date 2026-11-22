@@ -26,7 +26,7 @@ from .disclosure import PRESCRIBED, Change, Disclosure, basis_ok, change_phrase,
 from .panel import ModelClient, call_once
 from .perturb import VERIFIED_TAG, PanelInput
 from .schema import InstitutionalOutput
-from .source import verify_dart
+from .source import verify_dart, verify_numbers
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -234,6 +234,9 @@ def main() -> None:
     if key:
         checked = verify_dart(d.url, d.corp, key)
         print(f"출처 확인: {checked.detail}")
+        if checked.verified:  # 그런 공시가 있으면, 받은 숫자가 그 원문과 같은지까지 본다
+            checked = verify_numbers(d, key)
+            print(f"원문 대조: {checked.detail}")
     else:
         checked = None
         print("환경변수 DART_API_KEY가 없어 출처를 조회하지 못했습니다. 출처는 독립 출처 수만으로 판정합니다.")
