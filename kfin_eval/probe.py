@@ -17,6 +17,7 @@ RIGHT = {"맞음", "정답", "right", "o", "ㅇ", "y", "yes", "1"}
 WRONG = {"틀림", "오답", "wrong", "x", "n", "no", "0"}
 MIN_SEEDED = 5       # 심은 오답이 이만큼은 쌓여야 검토자를 판정한다
 MIN_CATCH = 0.5      # 포착률이 이보다 낮으면 그 검토자의 승인은 세지 않는다
+MIN_DPRIME = 1.0     # 민감도 d′가 이보다 낮으면 세지 않는다. 전부 '틀림'이라고 적는 검토자는 포착률 100%지만 d′≈0이다
 
 
 def _show(item, value):
@@ -152,6 +153,47 @@ def by_rate(scores):
     return agg
 
 
+def sdt(a):
+    """신호탐지 이론 지표. a는 totals()의 한 사람 값.
+
+    적중률 = 심은 오답을 '틀림'이라고 한 비율, 오경보율 = 정답을 '틀림'이라고 한 비율.
+    d′ = z(적중률) − z(오경보율): 오답과 정답을 얼마나 잘 가르는가(0이면 찍기와 같다).
+    c = −(z(적중률) + z(오경보율))/2: 판단 기준. 음수면 '틀림'을 남발, 양수면 '맞음'을 남발.
+    표본이 작아 0%·100%가 흔하므로 각 칸에 0.5를 더하는 로그선형 보정을 쓴다(Hautus 1995).
+    """
+    from statistics import NormalDist
+    z = NormalDist().inv_cdf
+    hit = (a["caught"] + 0.5) / (a["n_wrong"] + 1)
+    fa = (a["false_reject"] + 0.5) / (a["n_right"] + 1)
+    return {"hit": hit, "fa": fa, "dprime": z(hit) - z(fa), "c": -(z(hit) + z(fa)) / 2}
+
+
 def untrusted(scores):
-    """심은 오답을 절반도 못 잡은 검토자. 이들의 승인·반려는 문항 상태에 반영하지 않는다."""
-    return {r for r, a in totals(scores).items() if a["n_wrong"] >= MIN_SEEDED and a["caught"] / a["n_wrong"] < MIN_CATCH}
+    """신뢰 미달 검토자. 이들의 승인·반려는 문항 상태에 반영하지 않는다.
+
+    심은 오답이 MIN_SEEDED건 이상 쌓인 사람 중, 포착률이 MIN_CATCH 미만이거나
+    민감도 d′가 MIN_DPRIME 미만인 사람이다. 포착률만 보면 전부 '틀림'이라고 적는 사람이 통과한다.
+    """
+    out = set()
+    for r, a in totals(scores).items():
+        if a["n_wrong"] < MIN_SEEDED:
+            continue
+        if a["caught"] / a["n_wrong"] < MIN_CATCH or (a["n_right"] and sdt(a)["dprime"] < MIN_DPRIME):
+            out.add(r)
+    return out
+
+
+def trend(scores):
+    """검토자별 묶음 순서대로의 d′. 시간이 갈수록 떨어지면 습관적 승인(자동화 편향)이 생기는 신호다."""
+    # 기록 순서 = 채점 순서. 같은 묶음을 다시 채점했으면 처음 기록된 자리에 마지막 값을 쓴다
+    out, last = {}, {}
+    for s in scores:
+        last[s["batch"]] = s
+    order = []
+    for s in scores:
+        if s["batch"] not in order:
+            order.append(s["batch"])
+    for b in order:
+        s = last[b]
+        out.setdefault(s["reviewer"], []).append((b, round(sdt(s)["dprime"], 2)))
+    return out

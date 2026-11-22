@@ -13,8 +13,9 @@ from . import guardlink as GL
 from . import moat as MO
 from . import probe as P
 from . import score as S
+from . import stats as ST
 from . import store
-from .models import expand, get_model
+from .models import expand, get_model, judge_conflicts
 from .schema import content_hash, load_items, validate_all
 
 
@@ -109,10 +110,15 @@ def cmd_grade(p, a):
     d = p.runs / a.run_id
     items = {i["id"]: i for i in load_items(p.items)}
     judge = get_model(a.judge) if a.judge else None
+    responses = store.read_jsonl(d / "responses.jsonl")
+    same = judge_conflicts(a.judge, {r["model"] for r in responses})
+    if same and any(items.get(r["item_id"], {}).get("answer_type") == "rubric" for r in responses):
+        print(f"[경고] 채점 모델 {a.judge}와 같은 계열의 피평가 모델: {', '.join(same)}. "
+              "채점 모델은 자신과 관련된 모델의 답에 점수를 더 주는 편향이 보고돼 있습니다. 다른 회사 모델을 채점자로 쓰세요.")
     out = d / "grades.jsonl"
     out.unlink(missing_ok=True)
     n = 0
-    for r in store.read_jsonl(d / "responses.jsonl"):
+    for r in responses:
         it = items.get(r["item_id"])
         if it is None or content_hash(it) != r["item_hash"]:
             print(f"[건너뜀] {r['item_id']}: 응답 이후 문항이 바뀜")
@@ -121,7 +127,7 @@ def cmd_grade(p, a):
         store.append_jsonl(out, {"model": r["model"], "item_id": it["id"], "domain": it["domain"],
                                  "answer_type": it["answer_type"], "score": score, "detail": detail})
         n += 1
-    store.log_event(p.log, "grade", run_id=a.run_id, judge=a.judge or "keywords", graded=n)
+    store.log_event(p.log, "grade", run_id=a.run_id, judge=a.judge or "keywords", graded=n, judge_same_family=same)
     print(f"{n}건 채점 완료")
     return 0
 
@@ -145,8 +151,10 @@ def cmd_report(p, a):
         cells = [f"{avg(by[m][c]):.1f} ({len(by[m][c])})" if by[m][c] else "-" for c in cols]
         lo, hi = MO.cluster_interval([(group_of.get(r["item_id"], r["item_id"]), r["score"]) for r in rows if r["model"] == m])
         lines.append(f"| {m} | {lo:.1f} ~ {hi:.1f} | " + " | ".join(cells) + " |")
-    lines += ["", "두 모델의 구간이 겹치면 이 문항 수로는 우열을 말할 수 없다."]
+    lines += ["", "모델별 구간이다. 두 모델의 우열은 아래 '모델 쌍 비교'의 차이 구간으로 판단한다."]
     text = "\n".join(lines) + "\n"
+    if len(by) >= 2:
+        text += "\n" + ST.render_pairwise(ST.pairwise(rows, group_of))
     (d / "scoreboard.md").write_text(text, encoding="utf-8")
     print(text)
     return 0
@@ -290,7 +298,7 @@ def cmd_score(p, a):
     files = [p.runs / a.run_id / "grades.jsonl"] if a.run_id else sorted(p.runs.glob("*/grades.jsonl"))
     grades = [g for f in files for g in store.read_jsonl(f) if not (a.real_only and g["model"].startswith("mock-"))]
     rs = store.read_jsonl(p.reviewer_scores)
-    rows = S.item_rows(items, p.status(items), grades, store.read_jsonl(p.failures), store.read_jsonl(p.fail_ann))
+    rows = S.adjust(S.item_rows(items, p.status(items), grades, store.read_jsonl(p.failures), store.read_jsonl(p.fail_ann)))
     text = S.render(rows, S.people(rows, rs), P.untrusted(rs))
     p.score_report.write_text(text, encoding="utf-8")
     print(text)
@@ -306,6 +314,21 @@ def cmd_calibrate(p, a):
     rows, text = MO.calibrate(items, grades)
     (d / "calibration.md").write_text(text, encoding="utf-8")
     store.log_event(p.log, "calibrate", run_id=a.run_id, cells=[[r["author"], r["level"], round(r["mean"], 3)] for r in rows])
+    print(text)
+    return 0
+
+
+def cmd_irt(p, a):
+    d = p.runs / a.run_id
+    rows = store.read_jsonl(d / "grades.jsonl")
+    if not rows:
+        raise SystemExit("채점 결과가 없습니다. 먼저 grade를 실행하세요.")
+    items = {i["id"]: i for i in load_items(p.items)}
+    res = ST.rasch(rows)
+    text = ST.render_rasch(res, items)
+    (d / "irt.md").write_text(text, encoding="utf-8")
+    store.log_event(p.log, "irt", run_id=a.run_id, n_informative=res["n_informative"],
+                    theta={m: round(v, 3) for m, v in res["theta"].items()})
     print(text)
     return 0
 
@@ -329,10 +352,19 @@ def cmd_probe_report(p, a):
     print("| 심은 오답 비율 | 묶음 수 | 심은 오답 | 포착률 | 정답을 틀렸다고 한 비율 |\n|---|---|---|---|---|")
     for rate, v in sorted(P.by_rate(rs).items(), key=lambda kv: (kv[0] is None, kv[0] or 0)):
         print(f"| {'미기록' if rate is None else f'{rate:.0%}'} | {v['batches']} | {v['n_wrong']} | {pct(v['caught'], v['n_wrong'])} | {pct(v['false_reject'], v['n_right'])} |")
-    print("\n| 검토자 | 심은 오답 | 포착률 | 신뢰 |\n|---|---|---|---|")
+    print("\n| 검토자 | 심은 오답 | 포착률(적중) | 오경보율 | 민감도 d′ | 판단 기준 c | 신뢰 |\n|---|---|---|---|---|---|---|")
     bad = P.untrusted(rs)
     for name, v in sorted(P.totals(rs).items()):
-        print(f"| {name} | {v['n_wrong']} | {pct(v['caught'], v['n_wrong'])} | {'미달' if name in bad else '판정 전' if v['n_wrong'] < P.MIN_SEEDED else '충족'} |")
+        t = P.sdt(v)
+        lean = "틀림 쪽" if t["c"] < -0.25 else "맞음 쪽" if t["c"] > 0.25 else "중립"
+        print(f"| {name} | {v['n_wrong']} | {pct(v['caught'], v['n_wrong'])} | {pct(v['false_reject'], v['n_right'])} "
+              f"| {t['dprime']:.2f} | {t['c']:+.2f} ({lean}) | {'미달' if name in bad else '판정 전' if v['n_wrong'] < P.MIN_SEEDED else '충족'} |")
+    print(f"\nd′ {P.MIN_DPRIME} 미만 또는 포착률 {P.MIN_CATCH:.0%} 미만이면 신뢰 미달. d′와 c는 각 칸에 0.5를 더해 계산했다(표본이 작을 때 0%·100% 보정).")
+    tr = {k: v for k, v in P.trend(rs).items() if len(v) >= 2}
+    if tr:
+        print("\n묶음 순서별 d′ (떨어지면 습관적 승인이 생기는 신호)")
+        for name, seq in sorted(tr.items()):
+            print(f"- {name}: " + " → ".join(f"{x}" for _, x in seq))
     return 0
 
 
@@ -406,12 +438,14 @@ def main(argv=None):
     r = sub.add_parser("publish", help="공개·비공개 세트 분리, 해시 목록과 카나리 생성")
     r.add_argument("--private-rate", type=float, default=0.7, help="비공개로 둘 비율(기본 0.7)")
     r.add_argument("--seed", type=int, default=1)
-    sub.add_parser("probe-report", help="심은 오답 비율별·검토자별 포착률")
+    sub.add_parser("probe-report", help="심은 오답 비율별·검토자별 포착률, d′, 판단 기준")
+    r = sub.add_parser("irt", help="라쉬(1PL) 모형으로 문항 난도와 모델 실력 추정")
+    r.add_argument("--run-id", required=True)
     sub.add_parser("verify-log", help="출처 추적 로그 변조 검사")
     a = ap.parse_args(argv)
     return {"validate": cmd_validate, "review": cmd_review, "status": cmd_status, "run": cmd_run,
             "grade": cmd_grade, "report": cmd_report, "verify-log": cmd_verify_log, "failures": cmd_failures,
-            "annotate": cmd_annotate, "probe-report": cmd_probe_report, "calibrate": cmd_calibrate, "publish": cmd_publish, "probe-make": cmd_probe_make, "probe-score": cmd_probe_score, "score": cmd_score, "gen": cmd_gen, "guard-check": cmd_guard_check, "pipeline": cmd_pipeline, "failure-report": cmd_failure_report, "env-run": cmd_env_run}[a.cmd](Paths(a.root), a)
+            "annotate": cmd_annotate, "probe-report": cmd_probe_report, "irt": cmd_irt, "calibrate": cmd_calibrate, "publish": cmd_publish, "probe-make": cmd_probe_make, "probe-score": cmd_probe_score, "score": cmd_score, "gen": cmd_gen, "guard-check": cmd_guard_check, "pipeline": cmd_pipeline, "failure-report": cmd_failure_report, "env-run": cmd_env_run}[a.cmd](Paths(a.root), a)
 
 
 if __name__ == "__main__":

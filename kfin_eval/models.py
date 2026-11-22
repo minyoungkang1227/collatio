@@ -99,6 +99,28 @@ class EchoGuardModel:
         return self.complete(SYSTEM, build_prompt(item))
 
 
+def family(name):
+    """모델 계열. 'eg:claude-haiku' → 'claude', 'gpt-luna' → 'gpt'. 같은 회사 모델끼리 같은 값."""
+    n = name.split(":", 1)[-1].lower()
+    for fam, keys in (("claude", ("claude", "anthropic")), ("gpt", ("gpt", "openai", "o1", "o3", "o4")),
+                      ("gemini", ("gemini", "google")), ("llama", ("llama", "meta")), ("qwen", ("qwen",))):
+        if n.startswith(keys):
+            return fam
+    return n.split("-")[0]
+
+
+def judge_conflicts(judge, models):
+    """채점 모델과 같은 계열인 피평가 모델 목록.
+
+    채점 모델은 자신과 관련된 모델(같은 모델, 같은 계열, 그 모델의 출력으로 학습한 모델)의 답에 점수를 더 주는 편향이 보고돼 있다
+    (Li 외, "Preference Leakage: A Contamination Problem in LLM-as-a-judge", ICLR 2026).
+    여기서는 이름으로 알 수 있는 '같은 회사 계열'만 잡는다. 학습 데이터로 이어진 관계는 이름만으로는 알 수 없다."""
+    if not judge:
+        return []
+    f = family(judge)
+    return sorted({m for m in models if family(m) == f})
+
+
 def expand(spec):
     """'eg:all,mock-perfect' → 모델 이름 목록."""
     names = []
