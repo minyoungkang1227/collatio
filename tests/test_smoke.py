@@ -205,6 +205,8 @@ class Smoke(unittest.TestCase):
         r1 = guardlink.check(byid, store.read_jsonl(self.tmp / "runs" / "p1" / "responses.jsonl"))["summary"]
         self.assertGreater(r1["n_wrong"], 0)
         self.assertEqual(r1["recall"], 1.0)
+        self.assertGreaterEqual(r1["n_any_wrong"], r1["n_wrong"])
+        self.assertEqual(r1["any_recall"], 1.0)
         # 모두 같은 오답이면 못 잡는다(일치도 검사의 사각지대)
         self.run_cli("run", "--models", "mock-herd-a,mock-herd-b,mock-herd-c", "--run-id", "p2")
         r2 = guardlink.check(byid, store.read_jsonl(self.tmp / "runs" / "p2" / "responses.jsonl"))["summary"]

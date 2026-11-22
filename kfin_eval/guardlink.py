@@ -53,7 +53,13 @@ def check(items, responses, threshold=None):
     flagged = G.g1_agreement(answers, threshold)
     winners, shares = G.majority(answers)
     summary = G.evaluate(flagged, answers, truth)
-    summary.update(threshold=threshold, n_items=len(ids), models=models)
+    # 다수결과 별개로: 모델 하나라도 틀린 문항을 가드가 검토로 넘겼는가.
+    # 모델 하나만 쓰는 곳에서 다른 모델을 곁에 두고 대조하는 쓰임에 해당한다.
+    any_wrong = (answers != 0).any(axis=0)
+    hit = int((flagged & any_wrong).sum())
+    summary.update(threshold=threshold, n_items=len(ids), models=models, n_any_wrong=int(any_wrong.sum()),
+                   any_recall=hit / int(any_wrong.sum()) if any_wrong.any() else float("nan"),
+                   any_precision=hit / int(flagged.sum()) if flagged.any() else float("nan"))
     rows = [{"item_id": iid, "majority_correct": bool(winners[j] == 0), "share": float(shares[j]),
              "flagged": bool(flagged[j]), "answers": by[iid]} for j, iid in enumerate(ids)]
     return {"summary": summary, "rows": rows}
@@ -127,7 +133,11 @@ def render(result, items):
              f"| 다수결 답이 틀린 문항 | {s['n_wrong']}개 |",
              f"| 그중 가드가 잡은 비율(재현율) | {pct(s['recall'])} |",
              f"| 검토로 넘긴 것 중 실제로 틀린 비율(정밀도) | {pct(s['precision'])} |",
-             f"| 검토로 넘긴 비율 | {pct(s['review_rate'])} |", ""]
+             f"| 검토로 넘긴 비율 | {pct(s['review_rate'])} |",
+             f"| 모델 하나라도 틀린 문항 | {s['n_any_wrong']}개 |",
+             f"| 그중 가드가 검토로 넘긴 비율 | {pct(s['any_recall'])} |",
+             f"| 검토로 넘긴 것 중 실제로 누군가 틀린 비율 | {pct(s['any_precision'])} |", "",
+             "다수결이 틀린 문항이 없어도, 한 모델만 틀린 문항을 일치도 검사가 가려내는지는 아래 세 줄로 본다.", ""]
     lines += ["## 함께 틀렸는데 가드가 놓친 문항", "",
               "모델들이 같은 오답에 일치해서 일치도 검사를 통과했다. 가장 값진 실패 사례다.", ""]
     for r in missed:
