@@ -6,14 +6,14 @@ ShockLens는 뉴스를 읽어 사건을 구조화하는 단계(Event Analyst)와
 실행 (ShockLens 폴더 안에서. 두 저장소가 나란히 있다고 가정한다):
 
     cd C:\\Users\\admin\\shocklens
-    python ..\\echoguard\\integrations\\shocklens_agreement.py --mock      # 호출 없이 흐름만 확인
-    python ..\\echoguard\\integrations\\shocklens_agreement.py             # 실제 호출 (API 키와 비용 필요)
+    python ..\\collatio\\integrations\\shocklens_agreement.py --mock      # 호출 없이 흐름만 확인
+    python ..\\collatio\\integrations\\shocklens_agreement.py             # 실제 호출 (API 키와 비용 필요)
 
 입력   ShockLens 사건 라이브러리(data/library/events.yaml)의 제목 + 설명을 뉴스로 본다
 정답   같은 파일에 사람이 붙인 라벨
-모델   echoguard/config/experiment.yaml의 패널 중 --only로 고른 것 (기본: OpenAI·Anthropic 네 모델)
+모델   collatio/config/experiment.yaml의 패널 중 --only로 고른 것 (기본: OpenAI·Anthropic 네 모델)
 지시문 ShockLens의 Event Analyst 지시문과 가드레일을 그대로 쓴다. 모든 모델에 같은 방식(글로 JSON 받기)으로 묻는다
-결과   echoguard/data/runs/shocklens/agreement.jsonl 에 쌓이고, 멈춰도 다시 실행하면 이어서 한다
+결과   collatio/data/runs/shocklens/agreement.jsonl 에 쌓이고, 멈춰도 다시 실행하면 이어서 한다
 
 ShockLens 저장소는 고치지 않는다. 이 파일은 ShockLens의 모듈을 읽어 쓰기만 한다.
 """
@@ -34,7 +34,7 @@ ECHO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ECHO / "src"))
 sys.path.insert(0, os.getcwd())
 
-from echoguard import metrics  # noqa: E402
+from collatio import metrics  # noqa: E402
 
 FIELDS = ["instrument", "direction", "initiator", "target", "sectors", "severity_level"]
 CORE = ["instrument", "direction", "initiator"]  # 충격 계산의 경로를 정하는 세 필드
@@ -223,7 +223,7 @@ def main() -> None:
         pass
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--mock", action="store_true", help="호출 없이 가짜 모델로 흐름만 확인한다")
-    ap.add_argument("--only", default=DEFAULT_ONLY, help="쓸 모델 이름을 쉼표로 (echoguard 설정의 name)")
+    ap.add_argument("--only", default=DEFAULT_ONLY, help="쓸 모델 이름을 쉼표로 (collatio 설정의 name)")
     ap.add_argument("--runs", type=int, default=3, help="모델당 사건당 반복 횟수")
     ap.add_argument("--clean-only", action="store_true", help="겹침 사건이 없는(clean) 사건만 쓴다")
     a = ap.parse_args()

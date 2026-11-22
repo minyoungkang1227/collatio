@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from echoguard import metrics
+from collatio import metrics
 
 
 def stack(answers, n_runs=3):
@@ -166,7 +166,7 @@ def test_error_consistency_hand_value():
 def test_panel_value_separates_independent_errors_from_shared_ones():
     import numpy as np
 
-    from echoguard.metrics import panel_value
+    from collatio.metrics import panel_value
 
     rng = np.random.default_rng(0)
     n, truth, strata = 400, np.ones(400, dtype=int), np.array(["a"] * 400)

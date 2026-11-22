@@ -1,7 +1,7 @@
 [project]
-name = "echoguard"
+name = "collatio"
 version = "0.1.0"
-description = "Black-box stress test for correlated errors across LLMs on Korean financial news"
+description = "Checks what goes into and comes out of LLM readings of Korean financial disclosures against the original filings"
 requires-python = ">=3.10"
 
 [tool.pytest.ini_options]

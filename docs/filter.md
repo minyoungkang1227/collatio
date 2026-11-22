@@ -1,13 +1,13 @@
 # 필터로 쓰기
 
-EchoGuard의 본체는 가드다. AI의 답이 사람이나 다음 시스템으로 넘어가기 전에 걸러서, 의심스러운 것을 사람에게 넘긴다. 답을 고치지는 않는다.
+Collatio의 본체는 가드다. AI의 답이 사람이나 다음 시스템으로 넘어가기 전에 걸러서, 의심스러운 것을 사람에게 넘긴다. 답을 고치지는 않는다.
 
 `pipeline`은 그 가드가 얼마나 잘 잡는지 재는 실험이고, `filter`는 가드를 실제로 쓰는 창구다. 둘은 `guard.py`의 같은 함수를 부른다.
 
 ## 한 건 판정하기
 
 ```python
-from echoguard.filter import screen
+from collatio.filter import screen
 
 verdict = screen(
     outputs,                  # 모델 이름 → 그 모델의 반복 답들
@@ -19,7 +19,7 @@ verdict.decision   # "통과" 또는 "검토"
 verdict.reasons    # 걸린 이유들
 ```
 
-공시 숫자 한 건을 실제 모델에 묻고 판정하려면 `python -m echoguard.filter --numbers 공시.json`. API 키와 비용이 든다.
+공시 숫자 한 건을 실제 모델에 묻고 판정하려면 `python -m collatio.filter --numbers 공시.json`. API 키와 비용이 든다.
 
 ## 무엇을 보는가
 
@@ -40,9 +40,9 @@ verdict.reasons    # 걸린 이유들
 `--numbers`로 판정하면 `data/audit/decisions.jsonl`에 한 줄씩 남는다. 판정, 걸린 검사와 이유, 모델 버전, 기준값, 지시문 해시가 들어간다. 입력 글은 저장하지 않고 해시만 남긴다. 이 폴더는 리포에 올리지 않는다.
 
 ```
-python -m echoguard.audit summary data/audit/decisions.jsonl                     # 검토 비율, 걸린 검사, 사람이 아직 안 본 건
-python -m echoguard.audit review  data/audit/decisions.jsonl <id> <검토자> 반려 "메모"   # 사람의 결정을 남김
-python -m echoguard.audit verify  data/audit/decisions.jsonl                     # 기록이 고쳐지지 않았는지
+python -m collatio.audit summary data/audit/decisions.jsonl                     # 검토 비율, 걸린 검사, 사람이 아직 안 본 건
+python -m collatio.audit review  data/audit/decisions.jsonl <id> <검토자> 반려 "메모"   # 사람의 결정을 남김
+python -m collatio.audit verify  data/audit/decisions.jsonl                     # 기록이 고쳐지지 않았는지
 ```
 
 각 줄에 앞 줄의 해시가 들어 있어서 중간을 고치면 드러난다. 파일 전체를 다시 쓸 수 있는 사람까지 막지는 못한다.

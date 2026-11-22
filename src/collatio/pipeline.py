@@ -1,6 +1,6 @@
 """전체 흐름: 데이터 → 변형 → 패널 → 저장 → 측정 → 가드 → 보고.
 
-    python -m echoguard.pipeline --mock
+    python -m collatio.pipeline --mock
 
 실제 모델 호출은 아직 없다. --mock은 모의 모델로 층과 층이 맞물리는지 보여 준다.
 """

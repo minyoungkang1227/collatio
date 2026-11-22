@@ -6,10 +6,10 @@ import numpy as np
 import pytest
 import yaml
 
-from echoguard import guard, pipeline, store
-from echoguard.dataset import assign_split, load_labels
-from echoguard.mock import make_world
-from echoguard.perturb import UNVERIFIED_TAG, VERIFIED_TAG, build_inputs, fake_corroboration_text
+from collatio import guard, pipeline, store
+from collatio.dataset import assign_split, load_labels
+from collatio.mock import make_world
+from collatio.perturb import UNVERIFIED_TAG, VERIFIED_TAG, build_inputs, fake_corroboration_text
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -99,7 +99,7 @@ def test_fake_corroboration_text_cites_itself_with_invented_outlets():
 
 
 def test_extract_json_accepts_fences_and_chatter():
-    from echoguard.panel import extract_json
+    from collatio.panel import extract_json
 
     assert extract_json('```json\n{"intensity": 3, "direction": -1}\n```') == '{"intensity": 3, "direction": -1}'
     assert extract_json('판단 결과입니다: {"intensity": 2, "direction": 0} 이상입니다.') == '{"intensity": 2, "direction": 0}'
@@ -107,7 +107,7 @@ def test_extract_json_accepts_fences_and_chatter():
 
 
 def test_config_panel_builds_six_clients_in_three_families():
-    from echoguard.clients import build_clients, cost_usd
+    from collatio.clients import build_clients, cost_usd
 
     cfg = yaml.safe_load((ROOT / "config" / "experiment.yaml").read_text(encoding="utf-8"))
     clients = build_clients(cfg["panel"]["models"])          # 네트워크와 API 키 없이 만들어져야 한다
@@ -124,8 +124,8 @@ def test_dataset_rejects_news_before_the_window():
 
 
 def test_interrupted_run_resumes_without_repeating_calls(tmp_path):
-    from echoguard import panel
-    from echoguard.panel import Completion
+    from collatio import panel
+    from collatio.panel import Completion
 
     cfg = yaml.safe_load((ROOT / "config" / "experiment.yaml").read_text(encoding="utf-8"))
     items, written, _ = make_world(seed=3, n_items=10)
@@ -175,7 +175,7 @@ def test_label_file_round_trip(tmp_path):
 
 
 def test_rule_label_follows_the_intensity_rubric():
-    from echoguard.labeling import rule_label
+    from collatio.labeling import rule_label
 
     assert rule_label(-32, "없음") == (4, -1)
     assert rule_label(18, None) == (3, 1)
@@ -192,8 +192,8 @@ def test_items_without_a_flip_are_left_out_of_manipulated_scoring(tmp_path):
     """뒤집기 글이 없는 뉴스를 '전원 실패'로 세어 틀린 판단으로 잡으면 안 된다."""
     import yaml
 
-    from echoguard.mock import make_world
-    from echoguard.pipeline import run
+    from collatio.mock import make_world
+    from collatio.pipeline import run
 
     cfg = yaml.safe_load((ROOT / "config" / "experiment.yaml").read_text(encoding="utf-8"))
     items, written, clients = make_world(seed=cfg["seed"])
@@ -210,8 +210,8 @@ def test_perturbations_that_were_not_sent_are_not_scored(tmp_path):
     """문체 변형을 만들지 않은 실행에서 '답이 전부 바뀌었다'고 보고하면 안 된다."""
     import yaml
 
-    from echoguard.mock import make_world
-    from echoguard.pipeline import run
+    from collatio.mock import make_world
+    from collatio.pipeline import run
 
     cfg = yaml.safe_load((ROOT / "config" / "experiment.yaml").read_text(encoding="utf-8"))
     items, written, clients = make_world(seed=cfg["seed"], n_items=20)

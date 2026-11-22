@@ -1,6 +1,6 @@
-"""뉴스를 ShockLens로 해석하고, 그 해석을 EchoGuard 필터로 거른다.
+"""뉴스를 ShockLens로 해석하고, 그 해석을 Collatio 필터로 거른다.
 
-    뉴스 → ShockLens의 Event Analyst (모델 여러 개가 각자 해석) → EchoGuard 판정 (통과 / 검토 / 범위 밖)
+    뉴스 → ShockLens의 Event Analyst (모델 여러 개가 각자 해석) → Collatio 판정 (통과 / 검토 / 범위 밖)
 
 ShockLens는 뉴스 한 건을 '사건'으로 구조화한다(수단, 방향, 발동국, 대상국, 강도). 이 해석이 틀리면 뒤의 손실 계산이 전부 틀린다.
 여기서는 같은 뉴스를 여러 모델에 따로 해석시키고, 해석이 갈리거나 근거가 없으면 사람에게 넘긴다.
@@ -8,15 +8,15 @@ ShockLens는 뉴스 한 건을 '사건'으로 구조화한다(수단, 방향, �
 실행 (ShockLens 폴더 안에서. 두 저장소가 나란히 있다고 가정한다):
 
     cd C:\\Users\\admin\\shocklens
-    python ..\\echoguard\\integrations\\shocklens_screen.py --mock --file 뉴스.txt     # 호출 없이 흐름만 확인
-    python ..\\echoguard\\integrations\\shocklens_screen.py --today                    # 오늘 헤드라인에서 정책 토픽을 골라 판정
-    python ..\\echoguard\\integrations\\shocklens_screen.py --file 뉴스.txt            # 직접 고른 뉴스를 판정
+    python ..\\collatio\\integrations\\shocklens_screen.py --mock --file 뉴스.txt     # 호출 없이 흐름만 확인
+    python ..\\collatio\\integrations\\shocklens_screen.py --today                    # 오늘 헤드라인에서 정책 토픽을 골라 판정
+    python ..\\collatio\\integrations\\shocklens_screen.py --file 뉴스.txt            # 직접 고른 뉴스를 판정
 
 --today   ShockLens의 RSS 피드(config/daily_watch.yaml)에서 헤드라인을 모아 규칙으로 토픽을 묶고, 지역마다 정책 토픽 상위 N개를 쓴다
 --file    뉴스 본문을 '---' 한 줄로 구분해 적은 글 파일
 
 실제 호출에는 API 키(환경변수 ANTHROPIC_API_KEY, OPENAI_API_KEY)와 비용이 든다. 뉴스 1건 × 모델 4개 × 2회 = 8회 호출이다.
-잠정실적 공시는 ShockLens의 범위 밖이다(정책 사건만 다룬다). 공시는 `python -m echoguard.filter --numbers`로 판정한다.
+잠정실적 공시는 ShockLens의 범위 밖이다(정책 사건만 다룬다). 공시는 `python -m collatio.filter --numbers`로 판정한다.
 
 정답이 없는 뉴스이므로 여기서 재는 것은 '맞았는가'가 아니라 '믿고 넘겨도 되는 모양인가'다.
 ShockLens 저장소는 고치지 않는다.
@@ -38,8 +38,8 @@ sys.path.insert(0, str(ECHO / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path.cwd()))
 
-from echoguard import audit  # noqa: E402
-from echoguard.filter import Check, Verdict, show  # noqa: E402
+from collatio import audit  # noqa: E402
+from collatio.filter import Check, Verdict, show  # noqa: E402
 from shocklens_agreement import DEFAULT_ONLY, PanelLLM  # noqa: E402
 
 CORE = ["instrument", "direction", "initiator"]  # 충격 계산의 경로를 정하는 세 필드
@@ -250,7 +250,7 @@ def main() -> None:
     ap.add_argument("--regions", default="KR,US", help="--today에서 볼 지역")
     ap.add_argument("--top", type=int, default=2, help="--today에서 지역마다 고를 토픽 수")
     ap.add_argument("--all", action="store_true", help="--today에서 정책 토픽이 아닌 것도 포함한다")
-    ap.add_argument("--only", default=DEFAULT_ONLY, help="쓸 모델 이름을 쉼표로 (echoguard 설정의 name)")
+    ap.add_argument("--only", default=DEFAULT_ONLY, help="쓸 모델 이름을 쉼표로 (collatio 설정의 name)")
     ap.add_argument("--runs", type=int, default=2, help="모델당 뉴스당 반복 횟수")
     a = ap.parse_args()
 

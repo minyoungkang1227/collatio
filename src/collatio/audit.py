@@ -1,8 +1,8 @@
 """판정 기록: 필터가 내린 판정과 사람의 검토 결과를 남긴다.
 
-    python -m echoguard.audit summary data/audit/decisions.jsonl     # 기간 보고
-    python -m echoguard.audit verify  data/audit/decisions.jsonl     # 기록이 고쳐지지 않았는지 확인
-    python -m echoguard.audit review  data/audit/decisions.jsonl <판정 id> <검토자> <확정|반려> "메모"
+    python -m collatio.audit summary data/audit/decisions.jsonl     # 기간 보고
+    python -m collatio.audit verify  data/audit/decisions.jsonl     # 기록이 고쳐지지 않았는지 확인
+    python -m collatio.audit review  data/audit/decisions.jsonl <판정 id> <검토자> <확정|반려> "메모"
 
 필터는 걸러서 사람에게 넘긴다. 무엇을 왜 넘겼고 사람이 어떻게 결정했는지가 남지 않으면 나중에 따져 볼 수 없다.
 한 줄에 한 건씩 뒤에 덧붙이기만 한다. 고치거나 지우지 않는다.

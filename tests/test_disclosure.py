@@ -1,6 +1,6 @@
 import pytest
 
-from echoguard import disclosure as dz
+from collatio import disclosure as dz
 
 
 def make(**over):
@@ -66,7 +66,7 @@ def test_loss_continuing_in_the_key_figure_is_rejected():
 
 
 def test_basis_check_passes_only_the_prescribed_reading():
-    from echoguard.schema import InstitutionalOutput
+    from collatio.schema import InstitutionalOutput
 
     item = dz.to_news_item(make(), "t")
     fig = dz.figure_in_text(item, "original")
@@ -80,7 +80,7 @@ def test_basis_check_passes_only_the_prescribed_reading():
 def test_g6_flags_unanimous_answers_with_a_wrong_basis_and_g4b_lets_primary_sources_pass():
     import numpy as np
 
-    from echoguard import guard
+    from collatio import guard
 
     answers = np.array([[1, 1, 1], [1, 1, 1], [1, 1, 1]])            # 세 모델이 세 뉴스에 전부 같은 답
     share = np.array([[1, 0, np.nan], [1, 1, np.nan], [1, 1, np.nan]])  # 둘째 뉴스는 한 모델의 근거가 어긋남, 셋째는 값을 모름

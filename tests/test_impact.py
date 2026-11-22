@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from echoguard import impact
-from echoguard.metrics import FAILED
+from collatio import impact
+from collatio.metrics import FAILED
 
 
 def test_pnl_is_position_times_truth():

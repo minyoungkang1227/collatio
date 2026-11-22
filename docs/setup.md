@@ -31,8 +31,8 @@ macOS·Linux에서는 `~/.zshrc`나 `~/.bashrc`에 `export ANTHROPIC_API_KEY="..
 ## 3. 설치
 
 ```
-git clone https://github.com/minyoungkang1227/echoguard
-cd echoguard
+git clone https://github.com/minyoungkang1227/collatio
+cd collatio
 pip install -r requirements.txt
 pytest
 ```
@@ -41,7 +41,7 @@ pytest
 
 ```
 set PYTHONPATH=src
-python -m echoguard.check
+python -m collatio.check
 ```
 
 모델마다 지어낸 예문 하나를 3번씩 보낸다. 합쳐서 18회이고 비용은 몇 센트다. 모델별로 응답(강도/방향), 호출당 입력·출력 토큰, 본 실험 예상 비용이 나온다.

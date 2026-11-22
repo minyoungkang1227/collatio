@@ -1,4 +1,4 @@
-# EchoGuard MVP 실험 설정. 값을 바꾸면 data_version을 올린다.
+# Collatio MVP 실험 설정. 값을 바꾸면 data_version을 올린다.
 data_version: "0.3"   # 0.3: 방향 판단 기준을 지시문에 명시, 근거 지표·값을 함께 받음, 공시 요약을 숫자에서 생성
 seed: 20261115
 

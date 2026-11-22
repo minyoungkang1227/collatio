@@ -1,6 +1,6 @@
-from echoguard.disclosure import PRESCRIBED
-from echoguard.filter import screen, screen_disclosure
-from echoguard.schema import InstitutionalOutput
+from collatio.disclosure import PRESCRIBED
+from collatio.filter import screen, screen_disclosure
+from collatio.schema import InstitutionalOutput
 
 
 def out(direction, metric=PRESCRIBED, value="32% 감소"):
@@ -39,8 +39,8 @@ def test_no_answers_at_all_is_review():
 
 
 def test_disclosure_goes_through_the_panel(tmp_path):
-    from echoguard.disclosure import Disclosure
-    from echoguard.panel import Completion
+    from collatio.disclosure import Disclosure
+    from collatio.panel import Completion
 
     class Reader:
         family, tier = "x", None
@@ -70,7 +70,7 @@ def test_answer_that_moves_with_wording_goes_to_review():
 
 
 def test_dart_check_needs_the_receipt_to_exist_for_that_company():
-    from echoguard.source import receipt_no, verify_dart
+    from collatio.source import receipt_no, verify_dart
 
     class Reply:
         def __init__(self, body):
@@ -91,8 +91,8 @@ def test_dart_check_needs_the_receipt_to_exist_for_that_company():
 
 
 def test_drift_reports_changed_answers_and_versions():
-    from echoguard.drift import compare
-    from echoguard.schema import RunRecord
+    from collatio.drift import compare
+    from collatio.schema import RunRecord
 
     def rec(item, direction, version):
         return RunRecord(item_id=item, perturbation="original", model="m", run=0, track="institutional", output=out(direction),
@@ -103,7 +103,7 @@ def test_drift_reports_changed_answers_and_versions():
 
 
 def _disclosure(**over):
-    from echoguard.disclosure import Disclosure
+    from collatio.disclosure import Disclosure
 
     base = dict(item_id="d1", corp="가나전자", date="2026-10-20", period="2026년 3분기", unit="억원",
                 url="https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20261020900123",
@@ -112,7 +112,7 @@ def _disclosure(**over):
 
 
 def test_input_check_finds_numbers_that_contradict_each_other():
-    from echoguard.disclosure import quality
+    from collatio.disclosure import quality
 
     assert quality(_disclosure()) == []
     assert any("적자전환" in p for p in quality(_disclosure(op_yoy="적자전환")))          # 이익인데 적자전환
@@ -123,8 +123,8 @@ def test_input_check_finds_numbers_that_contradict_each_other():
 
 
 def test_bad_input_is_stopped_before_any_model_is_called_and_every_verdict_is_logged(tmp_path):
-    from echoguard import audit
-    from echoguard.panel import Completion
+    from collatio import audit
+    from collatio.panel import Completion
 
     calls = []
 

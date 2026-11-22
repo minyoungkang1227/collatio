@@ -1,9 +1,9 @@
 # ShockLens 점검: 사건 해석에서 모델들이 함께 틀리는가
 
-> 선택 기능이다. EchoGuard의 본체와 실험은 ShockLens에 기대지 않는다. 2026-11-18부터 이 연동은 더 넓히지 않는다.
+> 선택 기능이다. Collatio의 본체와 실험은 ShockLens에 기대지 않는다. 2026-11-18부터 이 연동은 더 넓히지 않는다.
 
 
-2026-11-17 · EchoGuard의 측정 방법을 [ShockLens](https://github.com/minyoungkang1227/shocklens)에 적용한다. 스크립트는 `integrations/shocklens_agreement.py`이고 ShockLens 저장소는 고치지 않는다.
+2026-11-17 · Collatio의 측정 방법을 [ShockLens](https://github.com/minyoungkang1227/shocklens)에 적용한다. 스크립트는 `integrations/shocklens_agreement.py`이고 ShockLens 저장소는 고치지 않는다.
 
 ## 무엇을 점검하나
 
@@ -21,7 +21,7 @@ ShockLens는 뉴스를 읽어 사건을 구조화하는 단계(Event Analyst)에
 |---|---|
 | 입력 | ShockLens 사건 라이브러리 39건의 제목 + 설명 |
 | 정답 | 같은 파일에 사람이 붙인 라벨 |
-| 모델 | GPT 2개, Claude 2개 (EchoGuard 패널 중 `--only`로 고름) |
+| 모델 | GPT 2개, Claude 2개 (Collatio 패널 중 `--only`로 고름) |
 | 지시문 | ShockLens의 Event Analyst 지시문과 가드레일 그대로 |
 | 묻는 방식 | 모든 모델에 글로 JSON을 받는다. ShockLens 본래 방식(Claude는 도구 호출)과 다르다 |
 | 반복 | 모델당 사건당 3회. 반복의 중앙값으로 맞음·틀림을 정한다 |
@@ -36,15 +36,15 @@ ShockLens는 뉴스를 읽어 사건을 구조화하는 단계(Event Analyst)에
 
 ```
 cd C:\Users\admin\shocklens
-python ..\echoguard\integrations\shocklens_agreement.py --mock
-python ..\echoguard\integrations\shocklens_agreement.py
+python ..\collatio\integrations\shocklens_agreement.py --mock
+python ..\collatio\integrations\shocklens_agreement.py
 ```
 
-첫 줄은 호출 없이 흐름만 확인한다. 둘째 줄이 실제 실행이고 사건 39건 × 모델 4개 × 3회 = 468번의 사건 해석을 한다. 응답은 `echoguard/data/runs/shocklens/agreement.jsonl`에 쌓이고, 멈춰도 다시 실행하면 이어서 한다.
+첫 줄은 호출 없이 흐름만 확인한다. 둘째 줄이 실제 실행이고 사건 39건 × 모델 4개 × 3회 = 468번의 사건 해석을 한다. 응답은 `collatio/data/runs/shocklens/agreement.jsonl`에 쌓이고, 멈춰도 다시 실행하면 이어서 한다.
 
 ## 이 점검의 한계
 
-- **모델이 사건을 이미 안다.** 라이브러리는 2002~2026년의 실제 사건이다. 모델의 학습 자료에 들어 있을 가능성이 높다. EchoGuard 본 실험은 뉴스 기간으로 이를 막았지만 여기서는 막지 못한다. 그래서 정확도는 부풀려질 수 있고, 결과는 "이 라이브러리에서의 겹침"으로만 읽는다.
+- **모델이 사건을 이미 안다.** 라이브러리는 2002~2026년의 실제 사건이다. 모델의 학습 자료에 들어 있을 가능성이 높다. Collatio 본 실험은 뉴스 기간으로 이를 막았지만 여기서는 막지 못한다. 그래서 정확도는 부풀려질 수 있고, 결과는 "이 라이브러리에서의 겹침"으로만 읽는다.
 - **39건이다.** 신뢰구간이 넓다. 강도 라벨이 없는 사건은 강도 채점에서 빠진다.
 - **정답도 사람의 판단이다.** 특히 강도와 산업은 라벨러에 따라 달라질 수 있다. 수단·방향·발동국이 가장 객관적이라 주 지표로 삼았다.
 - **묻는 방식이 ShockLens 본래와 다르다.** Claude의 정확도가 실제 운용 때와 다를 수 있다.
@@ -55,17 +55,17 @@ python ..\echoguard\integrations\shocklens_agreement.py
 
 아직 없다.
 
-## 뉴스를 ShockLens로 해석하고 EchoGuard로 거르기
+## 뉴스를 ShockLens로 해석하고 Collatio로 거르기
 
 위의 점검은 정답이 있는 과거 사건으로 "모델들이 함께 틀리는가"를 잰다. 아래는 정답이 없는 오늘의 뉴스에 필터를 실제로 거는 것이다.
 
 ```
 cd C:\Users\admin\shocklens
-python ..\echoguard\integrations\shocklens_screen.py --mock --file 뉴스.txt    # 호출 없이 흐름 확인
-python ..\echoguard\integrations\shocklens_screen.py --today                   # 오늘 헤드라인에서 정책 토픽을 골라 판정
+python ..\collatio\integrations\shocklens_screen.py --mock --file 뉴스.txt    # 호출 없이 흐름 확인
+python ..\collatio\integrations\shocklens_screen.py --today                   # 오늘 헤드라인에서 정책 토픽을 골라 판정
 ```
 
-같은 뉴스를 모델 네 개가 각자 ShockLens의 Event Analyst로 해석한다. EchoGuard가 그 해석들을 보고 통과, 검토, 범위 밖 중 하나로 판정한다.
+같은 뉴스를 모델 네 개가 각자 ShockLens의 Event Analyst로 해석한다. Collatio가 그 해석들을 보고 통과, 검토, 범위 밖 중 하나로 판정한다.
 
 | 검사 | 걸리는 경우 |
 |---|---|
@@ -80,4 +80,4 @@ python ..\echoguard\integrations\shocklens_screen.py --today                   #
 
 정답이 없으므로 "통과"가 "맞았다"를 뜻하지 않는다. 모델들이 같은 근거로 같은 해석을 했다는 뜻이다. 함께 틀린 해석은 통과한다. 그 비율이 얼마인지는 위의 과거 사건 점검이 답한다.
 
-잠정실적 공시는 ShockLens가 다루지 않는다. 공시는 `python -m echoguard.filter --numbers`로 판정한다.
+잠정실적 공시는 ShockLens가 다루지 않는다. 공시는 `python -m collatio.filter --numbers`로 판정한다.

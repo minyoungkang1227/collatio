@@ -1,4 +1,4 @@
-# EchoGuard 설계
+# Collatio 설계
 
 2026-11-15 · 초안
 

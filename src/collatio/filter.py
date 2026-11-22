@@ -1,7 +1,7 @@
 """필터: 문서 한 건에 대한 패널의 답을 그 자리에서 통과 또는 검토로 판정한다.
 
-    python -m echoguard.filter --mock                 # 모의 모델로 예시 세 건
-    python -m echoguard.filter --numbers 공시.json     # 공시 숫자 한 건을 실제 모델에 묻고 판정 (API 키와 비용 필요)
+    python -m collatio.filter --mock                 # 모의 모델로 예시 세 건
+    python -m collatio.filter --numbers 공시.json     # 공시 숫자 한 건을 실제 모델에 묻고 판정 (API 키와 비용 필요)
 
 pipeline은 실험이다. 정답을 알고 있는 뉴스 여러 건으로 가드가 얼마나 잘 잡는지 잰다.
 이 모듈은 그 가드를 실제로 쓰는 창구다. 정답을 모르는 문서 한 건을 받아 판정과 이유를 돌려준다.

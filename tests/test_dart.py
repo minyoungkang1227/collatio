@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from echoguard import dart
-from echoguard.disclosure import quality, to_news_item
+from collatio import dart
+from collatio.disclosure import quality, to_news_item
 
 FIX = Path(__file__).parent / "fixtures"
 
@@ -45,8 +45,8 @@ def test_numbers_are_checked_against_the_original_document():
     import io
     import zipfile
 
-    from echoguard.disclosure import flipped
-    from echoguard.source import differences, verify_numbers
+    from collatio.disclosure import flipped
+    from collatio.source import differences, verify_numbers
 
     xml = (FIX / "dart_ok.xml").read_text(encoding="utf-8")
     original = read("dart_ok.xml").disclosure.model_copy(update={"url": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20261020900123"})

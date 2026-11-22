@@ -8,7 +8,7 @@
 
 | 항목 | 바꾸는 곳 | 비고 |
 |---|---|---|
-| 모델 조합 | `config/experiment.yaml`의 `panel.models` | OpenAI, Anthropic, Google 세 회사만 지원한다. 다른 회사는 `src/echoguard/clients.py`에 클래스를 하나 추가해야 한다 |
+| 모델 조합 | `config/experiment.yaml`의 `panel.models` | OpenAI, Anthropic, Google 세 회사만 지원한다. 다른 회사는 `src/collatio/clients.py`에 클래스를 하나 추가해야 한다 |
 | 반복 횟수 | `panel.n_runs` | 줄이면 비용이 준다. 3 미만이면 모델 내 분산을 못 잰다 |
 | 문서 | `data/labels/news_labels.csv` | 아래 2번 |
 | 문서 기준일 | `dataset.news_from` | 패널에서 가장 늦게 나온 모델보다 뒤여야 한다. 모델이 정답을 이미 알면 실험이 무의미하다 |
@@ -22,9 +22,9 @@
    - 최소 건수: 흐름만 보려면 10건, 검정 결과를 읽으려면 60건 이상을 권한다. 건수가 적으면 신뢰구간이 넓어 아무 결론도 못 낸다.
    - 정답은 사람이 붙인다. 시험 대상인 AI에게 정답을 묻지 않는다.
    - `dataset.n_tune`과 `n_eval`의 합을 건수에 맞춘다.
-3. **모의 실행으로 설치 확인**: `PYTHONPATH=src python -m echoguard.pipeline --mock`
-4. **시험 호출로 비용 확인**: `PYTHONPATH=src python -m echoguard.check`. 모델별 예상 비용이 나온다.
-5. **본 실행**: `PYTHONPATH=src python -m echoguard.pipeline --run`. 응답은 `data/runs/<data_version>/`에 쌓이고, 멈춰도 다시 실행하면 이어서 한다.
+3. **모의 실행으로 설치 확인**: `PYTHONPATH=src python -m collatio.pipeline --mock`
+4. **시험 호출로 비용 확인**: `PYTHONPATH=src python -m collatio.check`. 모델별 예상 비용이 나온다.
+5. **본 실행**: `PYTHONPATH=src python -m collatio.pipeline --run`. 응답은 `data/runs/<data_version>/`에 쌓이고, 멈춰도 다시 실행하면 이어서 한다.
 
 Windows에서는 `PYTHONPATH=src` 대신 먼저 `set PYTHONPATH=src`를 실행한다.
 
@@ -48,4 +48,4 @@ Windows에서는 `PYTHONPATH=src` 대신 먼저 `set PYTHONPATH=src`를 실행�
 
 ## 결과와 의견 보내기
 
-[이슈](https://github.com/minyoungkang1227/echoguard/issues/new/choose)에 양식이 세 가지 있다: 돌려 본 결과, 막힌 곳, 방법에 대한 이의. 방법에 대한 이의를 가장 환영한다.
+[이슈](https://github.com/minyoungkang1227/collatio/issues/new/choose)에 양식이 세 가지 있다: 돌려 본 결과, 막힌 곳, 방법에 대한 이의. 방법에 대한 이의를 가장 환영한다.

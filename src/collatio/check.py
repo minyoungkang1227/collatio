@@ -1,7 +1,7 @@
 """시험 호출: 패널 모델을 각각 몇 번씩만 불러 연결, 형식, 토큰 수를 확인한다.
 
-    python -m echoguard.check            # 모델마다 3회
-    python -m echoguard.check --runs 1
+    python -m collatio.check            # 모델마다 3회
+    python -m collatio.check --runs 1
 
 본 실험 전에 반드시 돌린다. 여기서 나온 호출당 토큰 수로 전체 비용을 다시 계산한다.
 출력에는 API 키가 들어가지 않는다.

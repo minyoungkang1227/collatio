@@ -17,9 +17,9 @@ from pydantic import ValidationError
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
-from echoguard.dataset import NewsItem  # noqa: E402
-from echoguard.disclosure import Disclosure, conflicts, flipped, injected, quality, render, render_alt, to_news_item  # noqa: E402
-from echoguard.labeling import rule_label  # noqa: E402
+from collatio.dataset import NewsItem  # noqa: E402
+from collatio.disclosure import Disclosure, conflicts, flipped, injected, quality, render, render_alt, to_news_item  # noqa: E402
+from collatio.labeling import rule_label  # noqa: E402
 
 LABELS = ROOT / "data" / "labels" / "news_labels.csv"
 WRITTEN = ROOT / "data" / "labels" / "perturbations.csv"

@@ -17,8 +17,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
-from echoguard.disclosure import Disclosure, flipped  # noqa: E402
-from echoguard.source import verify_dart, verify_numbers  # noqa: E402
+from collatio.disclosure import Disclosure, flipped  # noqa: E402
+from collatio.source import verify_dart, verify_numbers  # noqa: E402
 
 NUMBERS = ROOT / "data" / "labels" / "disclosures.csv"
 

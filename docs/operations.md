@@ -11,7 +11,7 @@
 ## 모델 변경 점검
 
 ```
-python -m echoguard.drift 예전응답.jsonl 지금응답.jsonl
+python -m collatio.drift 예전응답.jsonl 지금응답.jsonl
 ```
 
 모델별로 비교한 글 수, 대표 답이 바뀐 비율, 바뀐 글, 버전 표기의 변화를 낸다. 모델이 그대로여도 답은 반복마다 조금 흔들리므로, 반복 중 가장 많이 나온 답끼리 비교한다.

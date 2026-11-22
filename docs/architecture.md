@@ -65,13 +65,13 @@ LLM이 관여하는 곳은 패널층 하나뿐이다. 그 뒤의 모든 숫자�
 ## 5. 폴더
 
 ```
-echoguard/
+collatio/
 ├── config/experiment.yaml      실험 설정 (시드, 반복 수, 변형, 가드 임계값)
 ├── prompts/                    모델에 주는 지시문
 ├── data/
 │   ├── labels/                 뉴스 요약과 정답 (공개)
 │   └── runs/                   모델 응답 기록 (비공개, .gitignore)
-├── src/echoguard/
+├── src/collatio/
 │   ├── dataset.py  perturb.py  panel.py  store.py
 │   ├── metrics.py  guard.py    pipeline.py
 │   ├── clients.py  check.py    실제 모델 호출, 시험 호출
@@ -85,7 +85,7 @@ echoguard/
 
 ```bash
 pip install -r requirements.txt
-PYTHONPATH=src python -m echoguard.pipeline --mock
+PYTHONPATH=src python -m collatio.pipeline --mock
 ```
 
 | | 상태 |

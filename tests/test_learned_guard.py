@@ -6,9 +6,9 @@ import numpy as np
 import pytest
 import yaml
 
-from echoguard import learned_guard as lg
-from echoguard import pipeline
-from echoguard.mock import make_world
+from collatio import learned_guard as lg
+from collatio import pipeline
+from collatio.mock import make_world
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -87,7 +87,7 @@ def test_rank_auc_matches_sklearn_including_ties():
     import numpy as np
     from sklearn.metrics import roc_auc_score
 
-    from echoguard.learned_guard import rank_auc
+    from collatio.learned_guard import rank_auc
 
     rng = np.random.default_rng(0)
     for _ in range(20):

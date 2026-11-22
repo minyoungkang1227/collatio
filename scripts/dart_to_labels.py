@@ -20,8 +20,8 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
-from echoguard import dart  # noqa: E402
-from echoguard.disclosure import Disclosure, conflicts, flipped, injected, quality, render, render_alt, to_news_item  # noqa: E402
+from collatio import dart  # noqa: E402
+from collatio.disclosure import Disclosure, conflicts, flipped, injected, quality, render, render_alt, to_news_item  # noqa: E402
 
 CANDIDATES = ROOT / "data" / "candidates" / "disclosures.csv"
 RAW = ROOT / "data" / "raw" / "dart"
