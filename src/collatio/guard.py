@@ -71,6 +71,6 @@ def evaluate(flagged: np.ndarray, answers: np.ndarray, truth: np.ndarray) -> dic
     return {
         "recall": float(caught.sum() / wrong.sum()) if wrong.any() else float("nan"),
         "precision": float(caught.sum() / flagged.sum()) if flagged.any() else float("nan"),
-        "review_rate": float(flagged.mean()),
+        "review_rate": float(flagged.mean()) if flagged.size else float("nan"),  # 채점할 뉴스가 없으면 정의되지 않는다
         "n_wrong": int(wrong.sum()),
     }
