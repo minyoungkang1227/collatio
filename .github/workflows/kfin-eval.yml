@@ -1,0 +1,87 @@
+name: kfin-eval
+
+# 'eval을 CI처럼': Collatio의 모델 목록·호출 코드·가드·프롬프트가 바뀌면 kfin-eval로 다시 잰다.
+#  - offline: 키 없이 항상. kfin-eval이 Collatio 코드를 그대로 불러 쓰는 부분(가드, 모델 목록, 입력 형식)이 깨지지 않았는지.
+#  - live: 실제 모델로 고정 30문항. main에 올라갔을 때와 손으로 실행할 때만(PR에서는 돌지 않아 비용·키 노출이 없다).
+#    저장소 Settings → Secrets에 ANTHROPIC_API_KEY / OPENAI_API_KEY가 있을 때만 해당 모델을 돌린다. 없으면 건너뛴다.
+#    한 번에 호출 약 90건(30문항 × 3모델). 비용은 모델 가격에 따라 다르다.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "config/experiment.yaml"
+      - "prompts/**"
+      - "src/collatio/clients.py"
+      - "src/collatio/guard.py"
+      - "src/collatio/perturb.py"
+      - "src/collatio/disclosure.py"
+      - ".github/workflows/kfin-eval.yml"
+  pull_request:
+    paths:
+      - "config/experiment.yaml"
+      - "prompts/**"
+      - "src/collatio/clients.py"
+      - "src/collatio/guard.py"
+      - "src/collatio/perturb.py"
+      - "src/collatio/disclosure.py"
+      - ".github/workflows/kfin-eval.yml"
+  workflow_dispatch:
+    inputs:
+      tolerance:
+        description: "모델별 허용 오답 증가 수"
+        default: "2"
+
+concurrency:
+  group: kfin-eval-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {path: collatio}
+      - uses: actions/checkout@v4
+        with: {repository: minyoungkang1227/kfin-eval, path: kfin-eval}
+      - uses: actions/checkout@v4
+        with: {repository: minyoungkang1227/shocklens, path: shocklens}
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12", cache: pip, cache-dependency-path: "collatio/requirements.txt"}
+      - run: pip install numpy pandas scipy pyyaml -r collatio/requirements.txt
+      - name: kfin-eval 전 과정 점검 (이 Collatio 코드로)
+        working-directory: kfin-eval
+        run: python -m unittest discover -s tests
+      - name: 소규모 eval 흐름 + Collatio 가드 (mock)
+        working-directory: kfin-eval
+        run: python -m kfin_eval ci-smoke --models mock-perfect,mock-noisy
+
+  live:
+    needs: offline
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {path: collatio}
+      - uses: actions/checkout@v4
+        with: {repository: minyoungkang1227/kfin-eval, path: kfin-eval}
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12", cache: pip, cache-dependency-path: "collatio/requirements.txt"}
+      - run: pip install numpy pyyaml -r collatio/requirements.txt
+      - name: 키가 있는 모델 고르기
+        id: pick
+        run: |
+          m=""
+          [ -n "$ANTHROPIC_API_KEY" ] && m="eg:claude-haiku,eg:claude-sonnet"
+          [ -n "$OPENAI_API_KEY" ] && m="${m:+$m,}eg:gpt-luna"
+          echo "models=$m" >> "$GITHUB_OUTPUT"
+          if [ -z "$m" ]; then echo "::notice::API 키 시크릿이 없어 실제 모델 eval을 건너뜁니다(ANTHROPIC_API_KEY / OPENAI_API_KEY)."; fi
+      - name: 소규모 eval (실제 모델, 고정 30문항, 기준선 real2)
+        if: steps.pick.outputs.models != ''
+        working-directory: kfin-eval
+        run: python -m kfin_eval ci-smoke --models "${{ steps.pick.outputs.models }}" --tolerance "${{ inputs.tolerance || '2' }}" --out smoke_out
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.pick.outputs.models != ''
+        with: {name: kfin-eval-smoke, path: kfin-eval/smoke_out, if-no-files-found: ignore}
