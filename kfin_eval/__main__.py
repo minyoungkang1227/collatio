@@ -368,6 +368,60 @@ def cmd_probe_report(p, a):
     return 0
 
 
+def cmd_ci_key(p, a):
+    """엔진 생성기 정답지가 ci/answer_key.json과 같은지. 다르면 1. --update면 갱신."""
+    from . import ci
+    path = p.root / "ci" / "answer_key.json"
+    key, skipped = ci.build_key(p.root)
+    if a.update:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        old = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+        old.update(key)                              # 이번에 못 돈 생성기의 기존 정답지는 지우지 않는다
+        path.write_text(json.dumps(old, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+        print(f"정답지 갱신: {', '.join(f'{k} {len(v)}문항' for k, v in key.items())}" + (f" / 건너뜀: {skipped}" if skipped else ""))
+        return 0
+    if not path.exists():
+        raise SystemExit("ci/answer_key.json이 없습니다. 먼저 ci-key --update")
+    diff = ci.compare_key(json.loads(path.read_text(encoding="utf-8")), key)
+    bad = {k: v for k, v in diff.items() if any(v.values())}
+    lines = ["### kfin-eval 정답지 점검 — " + ("실패" if bad else "통과"), ""]
+    for name, d in diff.items():
+        n_all = len(key.get(name, {}))
+        lines.append(f"- {name}: {n_all}문항, 정답이 바뀐 문항 {len(d['changed'])}, 없어진 문항 {len(d['missing'])}, 새 문항 {len(d['new'])}")
+        if d["changed"]:
+            lines.append(f"  - 바뀐 문항: {', '.join(d['changed'][:20])}{' …' if len(d['changed']) > 20 else ''}")
+    if skipped:
+        lines.append(f"- 건너뜀(비교 안 함): {', '.join(skipped)}")
+    if bad:
+        lines += ["", "엔진이 바뀌어 정답이 달라졌다. 의도한 변경이면 `python -m kfin_eval ci-key --update`로 갱신하고, "
+                  "이 문항으로 예전에 돌린 실행(real3 등)은 같은 문항의 결과가 아님을 기록한다."]
+    text = "\n".join(lines)
+    print(text)
+    ci.write_summary(text)
+    return 1 if bad else 0
+
+
+def cmd_ci_smoke(p, a):
+    """고정 30문항 소규모 eval. 기준선(real2)보다 오답이 tolerance 넘게 늘거나 모든 모델이 함께 틀리면 1."""
+    from . import ci
+    names = expand(a.models)
+    res, items, responses = ci.run_smoke(p.root, names, a.tolerance, out_dir=a.out)
+    spec = ci.load_smoke(p.root)
+    text = ci.smoke_markdown(res, len(items), [n.split(":", 1)[-1] for n in names], a.tolerance, spec["source"])
+    if len(names) >= 2 and not a.no_guard:
+        try:
+            g = ci.guard_on_smoke(items, responses)
+            rec = g["any_recall"]
+            text += (f"\n\n가드(Collatio G1) 점검: 검토로 넘긴 비율 {g['review_rate']:.0%}, "
+                     f"모델 하나라도 틀린 문항 {g['n_any_wrong']}개"
+                     + ("" if rec != rec else f", 그중 가드가 넘긴 비율 {rec:.0%}"))
+        except SystemExit as e:
+            text += f"\n\n가드 점검 건너뜀: {e}"
+    print(text)
+    ci.write_summary(text)
+    return 0 if res["ok"] else 1
+
+
 def cmd_verify_log(p, a):
     bad = store.verify_log(p.log)
     print("로그 정상" if not bad else f"변조 의심 줄: {bad}")
@@ -442,9 +496,17 @@ def main(argv=None):
     r = sub.add_parser("irt", help="라쉬(1PL) 모형으로 문항 난도와 모델 실력 추정")
     r.add_argument("--run-id", required=True)
     sub.add_parser("verify-log", help="출처 추적 로그 변조 검사")
+    r = sub.add_parser("ci-key", help="CI: 엔진 생성기 정답지가 고정본과 같은지 점검")
+    r.add_argument("--update", action="store_true", help="정답지를 지금 엔진 기준으로 갱신")
+    r = sub.add_parser("ci-smoke", help="CI: 고정 30문항 소규모 eval, 기준선(real2)과 비교")
+    r.add_argument("--models", required=True, help="예: eg:claude-haiku,eg:claude-sonnet,eg:gpt-luna 또는 mock-perfect,mock-noisy")
+    r.add_argument("--tolerance", type=int, default=2, help="모델별 허용 오답 증가 수(기본 2)")
+    r.add_argument("--out", help="응답을 저장할 폴더(CI 산출물용)")
+    r.add_argument("--no-guard", action="store_true", help="Collatio 가드 점검 생략")
     a = ap.parse_args(argv)
     return {"validate": cmd_validate, "review": cmd_review, "status": cmd_status, "run": cmd_run,
-            "grade": cmd_grade, "report": cmd_report, "verify-log": cmd_verify_log, "failures": cmd_failures,
+            "grade": cmd_grade, "report": cmd_report, "verify-log": cmd_verify_log,
+            "ci-key": cmd_ci_key, "ci-smoke": cmd_ci_smoke, "failures": cmd_failures,
             "annotate": cmd_annotate, "probe-report": cmd_probe_report, "irt": cmd_irt, "calibrate": cmd_calibrate, "publish": cmd_publish, "probe-make": cmd_probe_make, "probe-score": cmd_probe_score, "score": cmd_score, "gen": cmd_gen, "guard-check": cmd_guard_check, "pipeline": cmd_pipeline, "failure-report": cmd_failure_report, "env-run": cmd_env_run}[a.cmd](Paths(a.root), a)
 
 

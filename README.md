@@ -164,6 +164,33 @@ python -m kfin_eval grade --run-id v1 --judge claude-opus-5-5   # 서술형을 L
 다른 회사 모델은 `kfin_eval/models.py`에 `answer(item)`과 `complete(system, prompt)`를 가진
 클래스를 추가하고 `get_model`에 연결하면 된다.
 
+## CI: Collatio·ShockLens가 바뀌면 자동으로 다시 잰다
+
+kfin-eval은 Collatio의 모델 목록·호출 코드·가드와 ShockLens의 리스크 엔진을 불러 쓴다. 그쪽이 바뀌면 GitHub Actions가 아래를 돌린다.
+
+| 어디서 | 언제 | 무엇을 | 키 |
+|---|---|---|---|
+| Collatio `kfin-eval.yml` offline | `config/experiment.yaml`, `prompts/`, `clients.py`·`guard.py`·`perturb.py`·`disclosure.py`가 바뀐 push·PR | kfin-eval 전 과정 점검 + mock 모델 소규모 eval + Collatio 가드(G1) 호출 | 필요 없음 |
+| Collatio `kfin-eval.yml` live | 위 파일이 main에 올라갔을 때, 손으로 실행할 때(PR에서는 안 돈다) | 고정 30문항을 Collatio 패널 모델로 풀고 real2 기준선과 비교 | `ANTHROPIC_API_KEY`·`OPENAI_API_KEY` 시크릿. 없으면 건너뜀 |
+| ShockLens `kfin-eval.yml` | `engine/` 등이 바뀐 push·PR | 리스크 문항 정답지 점검 | 필요 없음 |
+| kfin-eval `tests.yml` | kfin-eval push·PR | 전 과정 점검, 정답지 점검, mock 소규모 eval | 필요 없음 |
+
+- **정답지 점검(`ci-key`)**: ShockLens·ELS·단위 환산 생성기로 real3와 같은 시드(1)의 문항 120개를 다시 만들고, 정답 해시를 `ci/answer_key.json`과 비교한다.
+  ShockLens 엔진의 수익률 계산에 일부러 1%를 곱해 보면 리스크 40문항 중 30문항이 바뀌었다고 실패한다(역스트레스 10문항은 그 함수를 쓰지 않는다).
+  의도한 변경이면 `python -m kfin_eval ci-key --update`로 갱신하고, 예전 실행(real3)이 같은 문항의 결과가 아님을 기록한다.
+- **소규모 eval(`ci-smoke`)**: `ci/smoke.json`의 30문항(공개분, 6단 전년 동기 역산 10·숨은 지시문 10 등 real2에서 오답이 나온 유형 위주).
+  기준선은 real2의 같은 문항 결과(claude-haiku 오답 6, claude-sonnet 3, gpt-luna 0). 실패 기준은 결과 전에 정했다:
+  모델 하나의 오답이 기준선보다 3개 이상 늘거나(`--tolerance 2`), 모든 모델이 함께 틀린 문항이 하나라도 있으면 실패.
+  문항마다 한 번만 묻기 때문에 1~2개 차이는 우연일 수 있다.
+- **아직 안 되는 것**: ShockLens의 LLM 프롬프트(`agents/prompts.py`)는 kfin-eval이 평가하지 않아 CI도 걸지 않았다.
+  아래 '세 저장소' 문서의 'ShockLens의 LLM 단계 점검'을 만들면 같은 방식으로 붙인다.
+
+```bash
+python -m kfin_eval ci-key                                        # 정답지 점검
+python -m kfin_eval ci-smoke --models mock-perfect,mock-noisy     # 키 없이 흐름만
+python -m kfin_eval ci-smoke --models eg:claude-haiku,eg:claude-sonnet,eg:gpt-luna   # 실제 모델
+```
+
 ## 문항 형식
 
 `data/items/*.jsonl`에 한 줄에 한 문항. 공통 필드:
