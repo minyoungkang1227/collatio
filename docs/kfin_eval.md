@@ -95,6 +95,25 @@
 
 다음에 할 것: 같은 문항을 여러 번 물어 오류율을 재기, 긴 문서 속 단위 환산을 따로 떼어 시험하기, 공시 원문 표를 그대로 주는 문항.
 
+## 다음 실험: 글 길이별 단위 환산 (units_long, 2026-11-23 추가, 아직 실제 모델로 안 돌림)
+
+real2와 real3의 단위 환산 결과는 서로 어긋난다. 같은 백만원→억원 환산을 claude-haiku는 긴 공시 요약에서 39문항 중 17건 틀렸고,
+한 문장 문항 5개는 모두 맞혔다. 글이 길어서인지 문항이 달라서인지 가르려고 길이만 바꾼 문항을 만든다.
+
+- 생성기 `plugins/units_long.py`: 핵심 사실 하나(당해 분기 영업이익, 전년 동기 대비 증감률)를 네 글에 똑같이 넣는다.
+  `short1` 한 문장 / `short4` 세 문장(숫자 여섯 개) / `long16` 부문 셋·지표 여럿(숫자 스물네 개 안팎, 핵심 문장 위치를 앞·중간·끝으로 돌림) /
+  `mixed` long16과 같되 다른 금액이 억원·천원으로 섞임. 네 문항의 정답은 같고 `meta.group`이 같다. 숫자는 모두 가상이다.
+- 결과표 `scripts/units_long_report.py`: 모델 × 길이 정답률, short1 대비 짝 비교(정확 McNemar), 오답이 정답의 10^k배인지.
+- 판단 기준(결과 전에 정함): 짝 비교에서 b − c ≥ 3이고 p < 0.05면 '길이 효과 있음'. b + c가 6 미만이면 p가 0.05 아래로 내려갈 수 없으므로
+  묶음은 40개 이상(문항 160개)으로 돌린다.
+
+```bash
+python -m kfin_eval gen --source units_long --n 160 --seed 11
+python -m kfin_eval run --models eg:claude-haiku,eg:claude-sonnet,eg:gpt-luna --include-draft --run-id ulong1
+python -m kfin_eval grade --run-id ulong1
+python scripts/units_long_report.py --run-id ulong1     # runs/ulong1/units_long.md
+```
+
 ## 연구 반영 보완 2 (v10)
 
 측정, LLM 평가, 모델 리스크 관리, 사람 감독, 유인 설계 다섯 분야의 연구와 대조해 고친 것이다.
