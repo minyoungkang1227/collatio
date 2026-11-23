@@ -209,7 +209,7 @@ def cmd_env_run(p, a):
 def cmd_gen(p, a):
     if a.source == "dart":
         if not a.file:
-            raise SystemExit("--file 에 EchoGuard의 data/labels/disclosures.csv 경로를 주세요.")
+            raise SystemExit("--file 에 Collatio의 data/labels/disclosures.csv 경로를 주세요.")
         out = p.items / f"gen_dart_{Path(a.file).stem}.jsonl"
     else:
         out = p.items / f"gen_{a.source}_s{a.seed}.jsonl"
@@ -253,14 +253,11 @@ def cmd_pipeline(p, a):
     cmd_grade(p, ns(run_id=run_id, judge=a.judge))
     cmd_failures(p, ns(run_id=run_id, threshold=1.0))
     cmd_report(p, ns(run_id=run_id))
-    from . import bridges
     engine = {i["id"] for i in load_items(p.items) if i.get("answer_source") == "engine"}
     if any(g["item_id"] in engine for g in store.read_jsonl(p.runs / run_id / "grades.jsonl")):
         cmd_calibrate(p, ns(run_id=run_id))
     if len(expand(a.models)) < 2:
         print("모델이 1개라 가드 점검은 건너뜀")
-    elif not bridges.available()["echoguard"]:
-        print("Collatio 저장소가 없어 가드 점검은 건너뜀(점수표와 난도 보정은 그것 없이도 나온다)")
     else:
         cmd_guard_check(p, ns(run_id=run_id, threshold=None))
     print(f"결과 폴더: {p.runs / run_id}")
@@ -467,9 +464,9 @@ def main(argv=None):
     r.add_argument("--file", help="dart 전용: 실제 공시 숫자 CSV")
     r.add_argument("--n", type=int, default=20)
     r.add_argument("--seed", type=int, default=1)
-    r = sub.add_parser("guard-check", help="EchoGuard 가드가 틀린 다수결을 잡는지 점검")
+    r = sub.add_parser("guard-check", help="Collatio 가드가 틀린 다수결을 잡는지 점검")
     r.add_argument("--run-id", required=True)
-    r.add_argument("--threshold", type=float, help="일치 기준(생략 시 EchoGuard 설정값)")
+    r.add_argument("--threshold", type=float, help="일치 기준(생략 시 Collatio 설정값)")
     r = sub.add_parser("pipeline", help="검사부터 점수표·가드 점검까지 한 번에")
     r.add_argument("--models", required=True, help="예: eg:all 또는 eg:claude-haiku,eg:gpt-luna")
     r.add_argument("--run-id")

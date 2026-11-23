@@ -1,73 +1,55 @@
-"""다른 저장소 연결. EchoGuard(거르기)와 ShockLens(정답 계산)의 코드를 그대로 불러 쓴다.
+"""다른 코드와의 연결.
 
-복사하지 않고 불러 쓰는 이유: 원본이 바뀌면 여기도 같이 바뀌어야 하기 때문이다.
-저장소 위치는 환경변수로 지정하거나, 이 프로젝트 폴더 옆에 두면 자동으로 찾는다.
+Collatio(거르기)는 같은 저장소의 패키지라 그냥 불러 쓴다. 2026-11-23에 kfin-eval을 Collatio 저장소로 합쳤다.
+ShockLens(리스크 문항의 정답 계산)는 별도 저장소다. 위치를 환경변수로 지정하거나 이 저장소 옆에 두면 찾는다.
 
-    COLLATIO_PATH=/path/to/collatio   SHOCKLENS_PATH=/path/to/shocklens   (옛 이름 ECHOGUARD_PATH도 받는다)
+    SHOCKLENS_PATH=/path/to/shocklens
 """
 import importlib
 import os
 import sys
 from pathlib import Path
 
-_ROOT = Path(__file__).resolve().parent.parent
+_ROOT = Path(__file__).resolve().parents[2]      # 저장소 폴더 (src/kfin_eval/bridges.py 기준)
 
 
-def _find(env, name, marker):
-    cands = [os.environ.get(env), _ROOT.parent / name, _ROOT / name, Path.cwd().parent / name]
-    for c in cands:
-        if c and (Path(c) / marker).exists():
-            return Path(c).resolve()
-    raise SystemExit(f"{name} 저장소를 찾지 못했습니다. {env} 환경변수로 위치를 지정하거나 "
-                     f"이 폴더 옆에 내려받으세요: git clone https://github.com/minyoungkang1227/{name}.git")
+def collatio(module):
+    """Collatio의 모듈. 예: collatio('disclosure'), collatio('guard'), collatio('clients')"""
+    return importlib.import_module(f"collatio.{module}")
 
 
-def _use(path):
-    if str(path) not in sys.path:
-        sys.path.insert(0, str(path))
+def collatio_path():
+    return _ROOT
 
 
-def _collatio():
-    """(저장소 폴더, 패키지 이름). 2026-11-22에 EchoGuard가 Collatio로 이름을 바꿨다. 두 이름을 모두 찾는다."""
-    here = [_ROOT.parent, _ROOT, Path.cwd().parent]
-    cands = [os.environ.get("COLLATIO_PATH"), os.environ.get("ECHOGUARD_PATH")]
-    cands += [base / name for name in ("collatio", "echoguard") for base in here]
-    for c in cands:
-        for pkg in ("collatio", "echoguard"):      # 폴더 이름과 패키지 이름이 서로 달라도 된다
-            if c and (Path(c) / "src" / pkg / "guard.py").exists():
-                return Path(c).resolve(), pkg
-    raise SystemExit("Collatio(옛 이름 EchoGuard) 저장소를 찾지 못했습니다. COLLATIO_PATH 환경변수로 위치를 지정하거나 "
-                     "이 폴더 옆에 내려받으세요: git clone https://github.com/minyoungkang1227/collatio.git")
-
-
-def echoguard_path():
-    return _collatio()[0]
-
-
-def echoguard(module):
-    """Collatio(옛 EchoGuard)의 모듈. 예: echoguard('disclosure'), echoguard('guard'), echoguard('clients')"""
-    path, pkg = _collatio()
-    _use(path / "src")
-    return importlib.import_module(f"{pkg}.{module}")
-
-
-def echoguard_config():
+def collatio_config():
     import yaml
-    return yaml.safe_load((echoguard_path() / "config" / "experiment.yaml").read_text(encoding="utf-8"))
+    return yaml.safe_load((_ROOT / "config" / "experiment.yaml").read_text(encoding="utf-8"))
+
+
+def _find_shocklens():
+    cands = [os.environ.get("SHOCKLENS_PATH"), _ROOT.parent / "shocklens", Path.cwd().parent / "shocklens"]
+    for c in cands:
+        if c and (Path(c) / "engine" / "risk.py").exists():
+            return Path(c).resolve()
+    raise SystemExit("shocklens 저장소를 찾지 못했습니다. SHOCKLENS_PATH 환경변수로 위치를 지정하거나 "
+                     "이 폴더 옆에 내려받으세요: git clone https://github.com/minyoungkang1227/shocklens.git")
 
 
 def shocklens(module):
     """예: shocklens('risk'), shocklens('reverse')"""
-    _use(_find("SHOCKLENS_PATH", "shocklens", "engine/risk.py"))
+    path = str(_find_shocklens())
+    if path not in sys.path:
+        sys.path.insert(0, path)
     return importlib.import_module(f"engine.{module}")
 
 
 def available():
-    out = {}
-    for name, fn in (("echoguard", lambda: echoguard("guard")), ("shocklens", lambda: shocklens("risk"))):
-        try:
-            fn()
-            out[name] = True
-        except (SystemExit, ImportError):
-            out[name] = False
+    """{'collatio': True, 'shocklens': 있으면 True}. collatio는 같은 저장소라 항상 있다."""
+    out = {"collatio": True}
+    try:
+        shocklens("risk")
+        out["shocklens"] = True
+    except (SystemExit, ImportError):
+        out["shocklens"] = False
     return out

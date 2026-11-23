@@ -8,17 +8,19 @@
 > 오답은 몇 가지 유형에 몰려 있다. 단위 환산의 자릿수 22건, 숨은 지시문 추종 7건, 그 밖의 계산·조건 적용 3건.
 > 두 모델 이상이 함께 틀린 문항은 한 번도 없었다. 표본이 작고(유형별 5~47문항) 문항마다 한 번씩만 물었다. 사람 검수자는 없다.
 
-[Collatio](https://github.com/minyoungkang1227/collatio)(옛 이름 EchoGuard)와
-[ShockLens](https://github.com/minyoungkang1227/shocklens)의 코드를 불러 쓴다. 세 저장소의 역할은 이렇다.
+> **2026-11-23: kfin-eval 저장소를 Collatio 저장소로 합쳤다.** 코드는 `src/kfin_eval/`, 이 문서는 예전 kfin-eval README다.
+> 명령은 모두 저장소 폴더에서 `PYTHONPATH=src`를 두고 돌린다(윈도우: `set PYTHONPATH=src`). 전체 점검은 `pytest`.
+> 합친 이유: 거르는 장치를 고친 커밋에서 그 효과를 바로 재기 위해서다. 필터와 그 필터를 채점하는 도구가 한 저장소에 있으므로,
+> 채점이 유리하게 맞춰지지 않았다는 근거는 문항 해시 목록(`dist/MANIFEST.json`)과 결과 전에 적어 둔 판단 기준에 둔다.
 
-| 저장소 | 역할 |
+| 부분 | 역할 |
 |---|---|
-| Collatio | 거른다. AI의 답을 사람에게 넘기기 전에 의심스러운 것을 가려낸다 |
-| kfin-eval | 잰다. 정답이 있는 문항으로 모델과 가드와 검토자를 시험한다 |
-| ShockLens | 계산한다. 리스크 수치 문항의 정답을 만든다 |
+| `src/collatio` | 거른다. AI의 답을 사람에게 넘기기 전에 의심스러운 것을 가려낸다 |
+| `src/kfin_eval` | 잰다. 정답이 있는 문항으로 모델과 가드와 검토자를 시험한다 |
+| [ShockLens](https://github.com/minyoungkang1227/shocklens) (별도 저장소) | 계산한다. 리스크 수치 문항의 정답을 만든다 |
 
 이 문서에 EchoGuard라고 적힌 곳은 모두 Collatio를 가리킨다(2026-11-22에 이름을 바꿨다).
-세 저장소가 무엇을 주고받는지, 금융 밖의 분야를 어떻게 붙이는지는 [docs/architecture.md](docs/architecture.md)에 있다.
+무엇을 주고받는지, 금융 밖의 분야를 어떻게 붙이는지는 [kfin_eval_architecture.md](kfin_eval_architecture.md)에 있다.
 
 ## 실행 기록
 
@@ -145,7 +147,7 @@ python -m kfin_eval score --real-only           # 묶음 보정 후 기여 점�
 ## 바로 돌려보기
 
 ```bash
-python -m unittest discover -s tests          # 전 과정 점검
+pytest                                        # 전 과정 점검 (collatio + kfin_eval)
 python -m kfin_eval validate                  # 문항 검사
 python -m kfin_eval run --models mock-perfect,mock-noisy,mock-blank --include-draft --run-id demo
 python -m kfin_eval grade --run-id demo
@@ -164,16 +166,13 @@ python -m kfin_eval grade --run-id v1 --judge claude-opus-5-5   # 서술형을 L
 다른 회사 모델은 `kfin_eval/models.py`에 `answer(item)`과 `complete(system, prompt)`를 가진
 클래스를 추가하고 `get_model`에 연결하면 된다.
 
-## CI: Collatio·ShockLens가 바뀌면 자동으로 다시 잰다
-
-kfin-eval은 Collatio의 모델 목록·호출 코드·가드와 ShockLens의 리스크 엔진을 불러 쓴다. 그쪽이 바뀌면 GitHub Actions가 아래를 돌린다.
+## CI: 거르는 쪽이나 ShockLens 엔진이 바뀌면 자동으로 다시 잰다
 
 | 어디서 | 언제 | 무엇을 | 키 |
 |---|---|---|---|
-| Collatio `kfin-eval.yml` offline | `config/experiment.yaml`, `prompts/`, `clients.py`·`guard.py`·`perturb.py`·`disclosure.py`가 바뀐 push·PR | kfin-eval 전 과정 점검 + mock 모델 소규모 eval + Collatio 가드(G1) 호출 | 필요 없음 |
-| Collatio `kfin-eval.yml` live | 위 파일이 main에 올라갔을 때, 손으로 실행할 때(PR에서는 안 돈다) | 고정 30문항을 Collatio 패널 모델로 풀고 real2 기준선과 비교 | `ANTHROPIC_API_KEY`·`OPENAI_API_KEY` 시크릿. 없으면 건너뜀 |
-| ShockLens `kfin-eval.yml` | `engine/` 등이 바뀐 push·PR | 리스크 문항 정답지 점검 | 필요 없음 |
-| kfin-eval `tests.yml` | kfin-eval push·PR | 전 과정 점검, 정답지 점검, mock 소규모 eval | 필요 없음 |
+| `tests.yml` | 모든 push·PR | collatio와 kfin_eval 테스트 전체, 정답지 점검, mock 모델 소규모 eval + 가드(G1) 호출. 같은 커밋의 코드끼리 시험한다 | 필요 없음 |
+| `eval-live.yml` | `config/experiment.yaml`, `prompts/`, `clients.py`·`guard.py`·`perturb.py`, `kfin_eval/models.py`, `ci/smoke.json`이 main에 올라갔을 때, 손으로 실행할 때(PR에서는 안 돈다) | 고정 30문항을 패널 모델로 풀고 real2 기준선과 비교 | `ANTHROPIC_API_KEY`·`OPENAI_API_KEY` 시크릿. 없으면 건너뜀 |
+| ShockLens `kfin-eval.yml` | ShockLens의 `engine/` 등이 바뀐 push·PR | 리스크 문항 정답지 점검 | 필요 없음 |
 
 - **정답지 점검(`ci-key`)**: ShockLens·ELS·단위 환산 생성기로 real3와 같은 시드(1)의 문항 120개를 다시 만들고, 정답 해시를 `ci/answer_key.json`과 비교한다.
   ShockLens 엔진의 수익률 계산에 일부러 1%를 곱해 보면 리스크 40문항 중 30문항이 바뀌었다고 실패한다(역스트레스 10문항은 그 함수를 쓰지 않는다).
@@ -183,7 +182,7 @@ kfin-eval은 Collatio의 모델 목록·호출 코드·가드와 ShockLens의 �
   모델 하나의 오답이 기준선보다 3개 이상 늘거나(`--tolerance 2`), 모든 모델이 함께 틀린 문항이 하나라도 있으면 실패.
   문항마다 한 번만 묻기 때문에 1~2개 차이는 우연일 수 있다.
 - **아직 안 되는 것**: ShockLens의 LLM 프롬프트(`agents/prompts.py`)는 kfin-eval이 평가하지 않아 CI도 걸지 않았다.
-  아래 '세 저장소' 문서의 'ShockLens의 LLM 단계 점검'을 만들면 같은 방식으로 붙인다.
+  [kfin_eval_architecture.md](kfin_eval_architecture.md)의 'ShockLens의 LLM 단계 점검'을 만들면 같은 방식으로 붙인다.
 
 ```bash
 python -m kfin_eval ci-key                                        # 정답지 점검
@@ -234,13 +233,12 @@ python -m kfin_eval verify-log
 ## 세 저장소 연결 (v3)
 
 EchoGuard(거르기), kfin-eval(재기), ShockLens(정답 계산)를 한 줄로 잇는다.
-두 저장소의 코드는 복사하지 않고 불러 쓴다. 이 폴더 옆에 내려받거나 환경변수로 위치를 알려 준다.
+Collatio는 같은 저장소의 패키지라 그냥 불러 쓴다. ShockLens만 옆에 내려받거나 환경변수로 위치를 알려 준다.
 
 ```bash
-git clone https://github.com/minyoungkang1227/collatio.git ../collatio     # 옛 이름 EchoGuard. 폴더 이름이 echoguard여도 찾는다
 git clone https://github.com/minyoungkang1227/shocklens.git ../shocklens
-pip install numpy pandas pydantic pyyaml          # 두 저장소가 쓰는 것
-# 또는: export COLLATIO_PATH=...  SHOCKLENS_PATH=...
+pip install -r requirements.txt
+# 또는: export SHOCKLENS_PATH=...
 ```
 
 | 가져다 쓰는 것 | 원본 | 여기서의 역할 |
@@ -366,7 +364,7 @@ python -m kfin_eval calibrate --run-id v5                    # runs/v5/calibrati
 # EchoGuard 폴더에서 (DART_API_KEY 필요)
 python scripts/sample_candidates.py && python scripts/fetch_disclosures.py 50 && python scripts/dart_to_labels.py 50
 # 이 폴더에서
-python -m kfin_eval gen --source dart --file ../echoguard/data/labels/disclosures.csv
+python -m kfin_eval gen --source dart --file data/labels/disclosures.csv
 ```
 
 공시 한 건에서 세 문항이 나온다(원문 요약, 말 바꾼 글, 숨은 지시문). 방향을 정할 수 없는 공시(적자지속, 변동 없음)는 뺀다.

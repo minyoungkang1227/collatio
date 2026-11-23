@@ -1,4 +1,6 @@
-# 세 저장소의 관계와 다른 분야로 넓히는 법
+# collatio·kfin_eval·ShockLens의 관계와 다른 분야로 넓히는 법
+
+> 2026-11-23에 kfin-eval을 Collatio 저장소로 합쳤다. 아래에서 Collatio는 `src/collatio`, kfin-eval은 `src/kfin_eval`을 가리킨다. ShockLens만 별도 저장소다.
 
 ## 세 저장소가 하는 일
 
@@ -21,15 +23,14 @@
 
 | 방향 | 주고받는 것 | 코드 |
 |---|---|---|
-| Collatio → kfin-eval | 공시 요약기, 방향 규칙, 입력 점검, 사실 뒤집기, 모델 호출부, 모델 목록 | `bridges.echoguard()` |
+| Collatio → kfin-eval | 공시 요약기, 방향 규칙, 입력 점검, 사실 뒤집기, 모델 호출부, 모델 목록 | `bridges.collatio()` (같은 저장소의 패키지를 그대로 import) |
 | ShockLens → kfin-eval | 팩터 충격 계산, 역스트레스테스트 | `bridges.shocklens()` |
 | kfin-eval → Collatio | 정답이 있는 문항과 모델의 실제 오답. 이것으로 가드의 재현율과 정밀도를 낸다 | `guardlink.py` |
 | kfin-eval → ShockLens | 엔진이 바뀌면 리스크 문항 정답이 바뀌었는지 CI가 알려 준다(정답지 점검). LLM 단계 평가는 아직 없다 | `ci.py`, ShockLens `.github/workflows/kfin-eval.yml` |
-| kfin-eval → Collatio | 모델 목록·호출 코드·가드가 바뀌면 CI가 고정 30문항으로 다시 잰다 | `ci.py`, Collatio `.github/workflows/kfin-eval.yml` |
+| kfin-eval → Collatio | 모델 목록·호출 코드·가드가 바뀌면 CI가 고정 30문항으로 다시 잰다 | `ci.py`, `.github/workflows/eval-live.yml` |
 
-세 저장소는 서로의 코드를 복사하지 않는다. kfin-eval이 나머지 둘을 불러 쓴다.
-Collatio와 ShockLens는 kfin-eval이 없어도 혼자 돈다. 반대로 kfin-eval도 둘 없이 점수표와 난도 보정까지는 낸다
-(가드 점검과 일부 생성기만 건너뛴다).
+코드를 복사하지 않는다는 원칙은 그대로다. kfin_eval이 collatio와 ShockLens를 불러 쓰고, 반대 방향의 import는 없다
+(collatio는 kfin_eval을 모른다). ShockLens가 옆에 없으면 리스크 문항 생성과 그 정답지 점검만 건너뛴다.
 
 ## 다음에 이을 수 있는 것
 

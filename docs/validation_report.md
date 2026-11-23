@@ -37,8 +37,8 @@ kfin-eval은 그 모델을 검증하는 도구다. 기준일 2026-11-22, 근거 
 |---|---|---|
 | 정답률 | gpt-luna 99.6, claude-sonnet 97.4, claude-haiku 93.4 (100점 만점) | `runs/real2/scoreboard.md` |
 | 모델 간 차이 | gpt-luna − claude-haiku만 Holm 보정 후 유의. 나머지 두 쌍은 보정 전 p 0.03대, 보정 후 0.057 | 같은 파일의 '모델 쌍 비교' |
-| 주된 오류 | 백만원→억원 환산 자릿수 19건, 과제 바꿔치기 지시문 추종 7건 | `README.md` 실행 기록 |
-| 새 영역(real3) | claude-sonnet 100.0, claude-haiku 99.2, gpt-luna 95.8. 120문항에서 오답 6건. real2와 모델 순위가 뒤집힌다 | `README.md` 실행 기록 |
+| 주된 오류 | 백만원→억원 환산 자릿수 19건, 과제 바꿔치기 지시문 추종 7건 | `docs/kfin_eval.md` 실행 기록 |
+| 새 영역(real3) | claude-sonnet 100.0, claude-haiku 99.2, gpt-luna 95.8. 120문항에서 오답 6건. real2와 모델 순위가 뒤집힌다 | `docs/kfin_eval.md` 실행 기록 |
 | 가드 성능 | real2와 real3를 합쳐 일치도 검사가 검토로 넘긴 32문항 = 누군가 틀린 32문항. 다수결이 틀린 문항이 없어 다수결 기준 성능은 못 쟀다 | `runs/real2/guard_check.md` |
 
 ## 4. 통제와 모니터링 (위험통제)

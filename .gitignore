@@ -13,3 +13,15 @@ data/audit/
 data/labels/perturbations.csv
 # 채우는 중인 엑셀 사본 (양식 원본 labeling_template.xlsx만 올린다)
 data/labels/*_filled.xlsx
+
+# --- kfin_eval (평가 도구) ---
+# 실행 결과
+runs/
+# 공개하지 않는 것: 비공개 문항, 선점 증명용 소금값, 검토 묶음의 정답, 모델 응답이 담긴 기록
+data/items/gen_*.jsonl
+data/private_salt.txt
+data/probes/
+data/*.jsonl
+data/*.md
+# CI에서 옆에 받아 두는 저장소
+.deps/

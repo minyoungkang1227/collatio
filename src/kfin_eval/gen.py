@@ -1,7 +1,7 @@
 """문항 생성기. 정답을 사람이 아니라 기존 엔진이 계산한다.
 
-- disclosure: EchoGuard의 공시 요약기(render, render_alt)와 방향 규칙(direction_of). 숫자는 가상.
-- dart:       같은 방식이되 실제 전자공시 숫자(EchoGuard가 만든 disclosures.csv)를 쓴다.
+- disclosure: Collatio의 공시 요약기(render, render_alt)와 방향 규칙(direction_of). 숫자는 가상.
+- dart:       같은 방식이되 실제 전자공시 숫자(Collatio가 만든 disclosures.csv)를 쓴다.
 - shocklens:  ShockLens의 리스크 엔진(basket_shock, scenario_losses, reverse.solve). 숫자는 가상.
 - els:        이 파일의 els_payoff. 다른 저장소가 필요 없다. 상품은 가상.
 
@@ -62,7 +62,7 @@ def _body(D, d, level, k=0):
     """난도에 맞는 본문. 숫자와 정답은 어느 단에서나 같다. (본문, 변형 이름, 덧붙일 정보)"""
     if level == 3:
         return D.render_alt(d), "paraphrase", {}
-    if level == 4:  # EchoGuard injected()와 같은 수법을 여러 문구·위치로 넓혔다
+    if level == 4:  # Collatio injected()와 같은 수법을 여러 문구·위치로 넓혔다
         out, info = _inject(D, d, k)
         return out, "injection", {"injection": info}
     return D.render(d), "original", {}
@@ -113,10 +113,10 @@ def _calc_items(D, d, source, author, prefix, group):
 
 def disclosure_items(n, seed):
     """가상 공시 n건. 난도 1~4를 고르게 섞고, 1·2단에는 사실 뒤집기 짝을 붙인다."""
-    D = bridges.echoguard("disclosure")
+    D = bridges.collatio("disclosure")
     rng, items, k, made = random.Random(seed), [], 0, 0
     r = lambda lo, hi: round(rng.uniform(lo, hi), 1)
-    source = {"title": "가상 공시. 요약과 정답은 EchoGuard disclosure 모듈로 생성", "as_of": _today()}
+    source = {"title": "가상 공시. 요약과 정답은 Collatio disclosure 모듈로 생성", "as_of": _today()}
     while made < n:
         k += 1
         level = made % 4 + 1
@@ -131,7 +131,7 @@ def disclosure_items(n, seed):
             op=op, op_yoy=sign * r(5, 60), op_qoq=other * r(3, 40),
             net=round(op * rng.uniform(0.5, 0.9)), net_yoy=other * r(5, 50),
             cum_op=round(op * rng.uniform(2.6, 3.4)), cum_op_yoy=other * r(3, 30))
-        if D.quality(d, typed=False):  # 숫자끼리 모순이면 버린다(EchoGuard의 G0 점검)
+        if D.quality(d, typed=False):  # 숫자끼리 모순이면 버린다(Collatio의 G0 점검)
             continue
         made += 1
         body, variant, extra = _body(D, d, level, made)
@@ -144,12 +144,12 @@ def disclosure_items(n, seed):
 
 
 def dart_items(path):
-    """실제 공시. EchoGuard의 scripts/dart_to_labels.py가 쓰는 data/labels/disclosures.csv를 읽는다.
+    """실제 공시. Collatio의 scripts/dart_to_labels.py가 쓰는 data/labels/disclosures.csv를 읽는다.
 
     한 공시에서 방향 문항 셋(원문 요약 1·2단, 말 바꾼 글 3단, 숨은 지시문 4단)과 계산 문항(5·6단)을 만든다.
     같은 공시에서 나온 문항은 meta.group이 같다. 통계를 낼 때는 공시 단위로 묶어야 한다.
     """
-    D = bridges.echoguard("disclosure")
+    D = bridges.collatio("disclosure")
     with open(path, encoding="utf-8-sig", newline="") as f:
         rows = [{k: (v if v != "" else None) for k, v in row.items()} for row in csv.DictReader(f)]
     items = []

@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "src"))
 
 from kfin_eval import bridges, ci  # noqa: E402
 from kfin_eval.__main__ import main  # noqa: E402

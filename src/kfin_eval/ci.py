@@ -1,7 +1,8 @@
 """CI에서 돌리는 작은 점검 두 가지 — 'eval을 CI처럼'.
 
-kfin-eval은 Collatio와 ShockLens의 코드를 불러 쓴다(bridges.py). 그쪽이 바뀌면 이쪽 결과도 바뀔 수 있는데,
-지금까지는 사람이 기억해서 다시 돌려야 했다. 아래 두 점검을 그 저장소들의 GitHub Actions에서 돌린다.
+kfin_eval은 같은 저장소의 collatio 패키지와, 별도 저장소인 ShockLens의 엔진을 불러 쓴다(bridges.py).
+그쪽이 바뀌면 이쪽 결과도 바뀔 수 있어서 아래 두 점검을 GitHub Actions에서 돌린다
+(이 저장소의 tests.yml·eval-live.yml, ShockLens의 kfin-eval.yml).
 
 1) 정답지 점검 (ci-key) — API 키 필요 없음, 몇 초
    엔진이 정답을 계산하는 생성기(ShockLens 충격·역스트레스, ELS, 단위 환산)로 문항을 고정 시드로 다시 만들고,

@@ -77,6 +77,10 @@ collatio/
 │   ├── clients.py  check.py    실제 모델 호출, 시험 호출
 │   ├── schema.py               모델 출력·기록 형식
 │   └── mock.py                 모의 뉴스와 모의 모델
+├── src/kfin_eval/              재는 도구 (2026-11-23 합침): 문항 생성·실행·채점·가드 점검·CI 점검. docs/kfin_eval.md
+├── data/items/  dist/  ci/     평가 문항(형식 예시), 공개 문항과 해시 목록, 정답지·smoke 문항
+├── plugins/                    다른 분야의 문항 생성기
+├── runs/                       평가 실행 결과 (비공개, .gitignore)
 ├── tests/
 └── docs/
 ```

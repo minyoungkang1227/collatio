@@ -1,9 +1,11 @@
 name: tests
 
+# 거르는 쪽(collatio)과 재는 쪽(kfin_eval)을 같은 커밋에서 함께 점검한다. API 키도 실제 모델 호출도 없다.
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   pytest:
@@ -11,13 +13,23 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.10", "3.12"]
+    env:
+      PYTHONPATH: src
+      SHOCKLENS_PATH: ${{ github.workspace }}/.deps/shocklens
     steps:
       - uses: actions/checkout@v4
+      # 리스크 문항의 정답은 ShockLens 엔진이 계산한다. 옆에 받아 둔다(.deps는 pytest가 들여다보지 않는다)
+      - uses: actions/checkout@v4
+        with: {repository: minyoungkang1227/shocklens, path: .deps/shocklens}
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-      - run: pip install -r requirements.txt
-      # 모의 모델과 지어낸 시험용 원문만 쓴다. API 키도 외부 접속도 필요 없다
+      - run: pip install scipy -r requirements.txt
+      # 모의 모델과 지어낸 시험용 원문만 쓴다
       - run: pytest -q
-      - run: PYTHONPATH=src python -m collatio.filter --mock
+      - run: python -m collatio.filter --mock
+      - name: 정답지 점검 (엔진이 계산한 정답이 고정본과 같은가)
+        run: python -m kfin_eval ci-key
+      - name: 소규모 eval 흐름 + 가드 (mock 모델)
+        run: python -m kfin_eval ci-smoke --models mock-perfect,mock-noisy

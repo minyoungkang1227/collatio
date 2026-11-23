@@ -1,7 +1,7 @@
-"""EchoGuard 가드를 평가 세트 위에서 돌려 본다.
+"""Collatio 가드를 평가 세트 위에서 돌려 본다.
 
 평가 세트에는 정답이 있다. 그래서 '모델들의 다수결 답이 틀린 문항'을 가드가 얼마나 잡는지 셀 수 있다.
-가드 함수(majority, g1_agreement, evaluate)는 EchoGuard의 것을 그대로 쓴다.
+가드 함수(majority, g1_agreement, evaluate)는 Collatio의 것을 그대로 쓴다.
 """
 from collections import defaultdict
 
@@ -27,9 +27,9 @@ def normalize(item, response):
 def check(items, responses, threshold=None):
     """{summary, rows}. rows는 문항별 다수결·일치 비율·가드 판정."""
     import numpy as np
-    G = bridges.echoguard("guard")
+    G = bridges.collatio("guard")
     if threshold is None:
-        threshold = bridges.echoguard_config()["guard"]["agreement_alert"]
+        threshold = bridges.collatio_config()["guard"]["agreement_alert"]
 
     by = defaultdict(dict)
     for r in responses:
@@ -66,16 +66,16 @@ def check(items, responses, threshold=None):
 
 
 def check_probe(items, responses, threshold=None):
-    """말 바꿔 다시 묻기(EchoGuard G3). 같은 공시의 원문 요약과 말 바꾼 글에 대한 다수결 답이 다르면 검토로 넘긴다.
+    """말 바꿔 다시 묻기(Collatio G3). 같은 공시의 원문 요약과 말 바꾼 글에 대한 다수결 답이 다르면 검토로 넘긴다.
 
     일치도 검사(G1)는 모델들이 같은 오답에 일치하면 통과시킨다. G3는 모델끼리가 아니라
     같은 내용의 두 표현 사이를 비교하므로, 한쪽 표현에서만 함께 틀린 경우를 잡을 수 있다.
     짝이 있는 공시(meta.group이 같고 variant가 original·paraphrase인 방향 문항)만 대상이다.
     """
     import numpy as np
-    G = bridges.echoguard("guard")
+    G = bridges.collatio("guard")
     if threshold is None:
-        threshold = bridges.echoguard_config()["guard"]["agreement_alert"]
+        threshold = bridges.collatio_config()["guard"]["agreement_alert"]
     pairs = defaultdict(dict)
     for it in items.values():
         m = it.get("meta", {})
@@ -127,7 +127,7 @@ def render(result, items):
     missed = [r for r in result["rows"] if not r["majority_correct"] and not r["flagged"]]
     caught = [r for r in result["rows"] if not r["majority_correct"] and r["flagged"]]
     false_alarm = [r for r in result["rows"] if r["majority_correct"] and r["flagged"]]
-    lines = ["# 가드 점검 (EchoGuard G1: 모델 일치도)", "",
+    lines = ["# 가드 점검 (Collatio G1: 모델 일치도)", "",
              f"모델 {len(s['models'])}개({', '.join(s['models'])}), 문항 {s['n_items']}개, 일치 기준 {s['threshold']}.", "",
              "| 항목 | 값 |", "|---|---|",
              f"| 다수결 답이 틀린 문항 | {s['n_wrong']}개 |",

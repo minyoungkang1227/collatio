@@ -1,7 +1,7 @@
 """모델 어댑터.
 
 mock-*  API 없이 파이프라인을 점검하는 가짜 모델
-eg:이름  EchoGuard 설정(config/experiment.yaml)의 패널 모델. 세 회사 호출·재시도 코드를 그대로 쓴다. eg:all 은 전부
+eg:이름  Collatio 설정(config/experiment.yaml)의 패널 모델. 세 회사 호출·재시도 코드를 그대로 쓴다. eg:all 은 전부
 claude-* Anthropic 직접 호출
 """
 import hashlib
@@ -80,16 +80,16 @@ class AnthropicModel:
         return self.complete(SYSTEM, build_prompt(item))
 
 
-class EchoGuardModel:
-    """EchoGuard의 모델 클라이언트를 감싼다. API 키는 각 회사 환경변수에서 읽는다."""
+class CollatioModel:
+    """Collatio의 모델 클라이언트를 감싼다. API 키는 각 회사 환경변수에서 읽는다."""
 
     def __init__(self, name):
-        match = [m for m in bridges.echoguard_config()["panel"]["models"] if m["name"] == name]
+        match = [m for m in bridges.collatio_config()["panel"]["models"] if m["name"] == name]
         if not match:
-            raise SystemExit(f"EchoGuard 설정에 없는 모델: {name}")
+            raise SystemExit(f"Collatio 설정에 없는 모델: {name}")
         self.name = name
-        self._client = bridges.echoguard("clients").build_clients(match)[0]
-        self._input = bridges.echoguard("perturb").PanelInput
+        self._client = bridges.collatio("clients").build_clients(match)[0]
+        self._input = bridges.collatio("perturb").PanelInput
 
     def complete(self, system, prompt):
         inp = self._input(item_id="kfin-eval", perturbation="original", text=prompt)
@@ -125,7 +125,7 @@ def expand(spec):
     """'eg:all,mock-perfect' → 모델 이름 목록."""
     names = []
     for n in (x.strip() for x in spec.split(",") if x.strip()):
-        names += [f"eg:{m['name']}" for m in bridges.echoguard_config()["panel"]["models"]] if n == "eg:all" else [n]
+        names += [f"eg:{m['name']}" for m in bridges.collatio_config()["panel"]["models"]] if n == "eg:all" else [n]
     return names
 
 
@@ -133,7 +133,7 @@ def get_model(name):
     if name.startswith("mock-"):
         return MockModel(name)
     if name.startswith("eg:"):
-        return EchoGuardModel(name[3:])
+        return CollatioModel(name[3:])
     if name.startswith("claude"):
         return AnthropicModel(name)
     # 다른 회사 모델은 answer(item) / complete(system, prompt)를 가진 클래스를 추가하면 된다.

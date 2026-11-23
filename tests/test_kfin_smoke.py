@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "src"))
 
 from kfin_eval import store  # noqa: E402
 from kfin_eval.__main__ import main  # noqa: E402
@@ -174,7 +174,7 @@ class Smoke(unittest.TestCase):
         self.assertEqual(len(E.run_episode(sc, E.LLMAgent(Fake()))["trace"]), 1)
         self.assertEqual(self.run_cli("env-run", "--scenario", "suitability-001", "--agents", "mock-good,mock-bad", "--run-id", "e1"), 0)
 
-    @unittest.skipUnless(all(__import__("kfin_eval.bridges", fromlist=["x"]).available().values()), "echoguard/shocklens 저장소 없음")
+    @unittest.skipUnless(all(__import__("kfin_eval.bridges", fromlist=["x"]).available().values()), "shocklens 저장소 없음")
     def test_bridges(self):
         import math
         from kfin_eval import gen, guardlink
@@ -212,7 +212,7 @@ class Smoke(unittest.TestCase):
         r2 = guardlink.check(byid, store.read_jsonl(self.tmp / "runs" / "p2" / "responses.jsonl"))["summary"]
         self.assertGreater(r2["n_wrong"], 0)
         self.assertEqual(r2["recall"], 0.0)
-        # EchoGuard 설정의 모델 이름을 그대로 쓴다(호출은 하지 않음)
+        # Collatio 설정의 모델 이름을 그대로 쓴다(호출은 하지 않음)
         from kfin_eval.models import expand, get_model
         self.assertEqual(len(expand("eg:all")), 6)
         self.assertEqual(get_model("eg:claude-haiku").name, "claude-haiku")
@@ -280,7 +280,7 @@ class Smoke(unittest.TestCase):
         r2 = score.item_rows(self.items, st, grades, fails, [{"failure_id": "f1", "error_type": "item"}])
         self.assertEqual(next(r for r in r2 if r["item_id"] == "risk-0001")["points"], 0.0)
 
-    @unittest.skipUnless(all(__import__("kfin_eval.bridges", fromlist=["x"]).available().values()), "echoguard/shocklens 저장소 없음")
+    @unittest.skipUnless(all(__import__("kfin_eval.bridges", fromlist=["x"]).available().values()), "shocklens 저장소 없음")
     def test_ladder_and_moat(self):
         import json, re
         from kfin_eval import bridges, moat
@@ -316,9 +316,9 @@ class Smoke(unittest.TestCase):
         dist = lambda z: float(z @ np.linalg.inv(S) @ z)
         other = np.array([x[0] * 1.3, (-loss - b[0] * x[0] * 1.3) / b[1]])   # 같은 손실을 내는 다른 충격
         self.assertLess(dist(x), dist(other))
-        # 실제 공시 경로: EchoGuard 예시 공시 한 건으로 세 문항(2·3·4단)
-        D = bridges.echoguard("disclosure")
-        ex = json.loads((bridges.echoguard_path() / "data" / "examples" / "disclosure_example.json").read_text(encoding="utf-8"))
+        # 실제 공시 경로: Collatio 예시 공시 한 건으로 세 문항(2·3·4단)
+        D = bridges.collatio("disclosure")
+        ex = json.loads((bridges.collatio_path() / "data" / "examples" / "disclosure_example.json").read_text(encoding="utf-8"))
         import csv
         src = self.tmp / "disclosures.csv"
         with src.open("w", encoding="utf-8", newline="") as f:
@@ -375,7 +375,7 @@ class Smoke(unittest.TestCase):
         after = {m["id"]: m["split"] for m in json.loads((self.tmp / "dist" / "MANIFEST.json").read_text(encoding="utf-8"))["items"]}
         self.assertTrue(all(after[k] == v for k, v in before.items()))   # 문항이 늘어도 기존 소속은 그대로
 
-    @unittest.skipUnless(__import__("kfin_eval.bridges", fromlist=["x"]).available()["echoguard"], "echoguard 저장소 없음")
+    @unittest.skipUnless(__import__("kfin_eval.bridges", fromlist=["x"]).available()["collatio"], "collatio 없음")
     def test_probe_guard_and_interval(self):
         from kfin_eval import guardlink, moat
         ch = {"A": "긍정", "B": "중립", "C": "부정"}

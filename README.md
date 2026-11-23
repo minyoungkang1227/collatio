@@ -36,6 +36,26 @@ A filter for LLM readings of Korean financial disclosures, and the experiments t
 
 필터 사용법은 [docs/filter.md](docs/filter.md), 운영 쪽 위험(모델 변경, 공급사 장애, 숨긴 지시문)은 [docs/operations.md](docs/operations.md), 다루는 문제의 지도는 [docs/problem_register.md](docs/problem_register.md).
 
+## 거르는 장치를 재는 도구 (kfin_eval)
+
+2026-11-23에 [kfin-eval](https://github.com/minyoungkang1227/kfin-eval) 저장소를 이 저장소로 합쳤다(`src/kfin_eval/`, 커밋 기록 포함).
+정답이 있는 문항으로 모델을 시험하고, 거기서 나온 실제 오답을 위의 가드가 잡는지 센다.
+
+| | real1 | real2 | real3 | 합계 |
+|---|---|---|---|---|
+| 호출 | 423 | 813 | 360 | 1,596 |
+| 오답 | 0 | 26 | 6 | 32 |
+| 일치도 검사가 넘긴 문항 = 누군가 틀린 문항 | - | 26 = 26 | 6 = 6 | 32 = 32 |
+
+세 모델이 같은 오답을 낸 경우는 아직 없어서, 그때 가드가 잡는지는 모른다. 문항마다 한 번씩만 물었고 사람 검수자는 없다.
+자세한 내용은 [docs/kfin_eval.md](docs/kfin_eval.md), 검증 보고서는 [docs/validation_report.md](docs/validation_report.md).
+모델 목록·호출 코드·가드·프롬프트가 바뀌면 CI가 고정 30문항으로 다시 잰다(`.github/workflows/eval-live.yml`, API 키 시크릿이 있을 때).
+
+```bash
+PYTHONPATH=src python -m kfin_eval ci-key                                     # 엔진이 계산한 정답이 고정본과 같은가
+PYTHONPATH=src python -m kfin_eval ci-smoke --models mock-perfect,mock-noisy  # 키 없이 소규모 eval 흐름
+```
+
 ## 문서
 
 결과 [docs/findings.md](docs/findings.md) · 실험 기록 [docs/pilot_log.md](docs/pilot_log.md) · 가설과 분석 방법 [docs/experiment_spec.md](docs/experiment_spec.md) · 선행연구 [docs/related_work.md](docs/related_work.md) · 코드 구조 [docs/architecture.md](docs/architecture.md)
