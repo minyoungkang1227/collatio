@@ -1,0 +1,87 @@
+# 세 저장소의 관계와 다른 분야로 넓히는 법
+
+## 세 저장소가 하는 일
+
+```
+                  정답을 계산한다                    문항을 만든다
+   ShockLens ───────────────────────┐        ┌──────────── Collatio
+   (리스크 엔진)                      ▼        ▼            (공시 요약기, 방향 규칙)
+                                ┌──────────────────┐
+     plugins/*.py ────────────▶ │     kfin-eval    │ ◀──── 실제 공시(전자공시)
+     (다른 분야의 생성기)          │  문항 → 실행 → 채점 │
+                                └──────────────────┘
+                                   │            │
+              틀린 답과 정답을 준다   ▼            ▼   모델 호출부를 빌려 쓴다
+                              Collatio 가드     Collatio clients
+                          (일치도, 말 바꿔 다시 묻기)
+                                   │
+                                   ▼
+                    가드가 오답을 몇 % 잡았는지 = Collatio가 혼자서는 낼 수 없던 숫자
+```
+
+| 방향 | 주고받는 것 | 코드 |
+|---|---|---|
+| Collatio → kfin-eval | 공시 요약기, 방향 규칙, 입력 점검, 사실 뒤집기, 모델 호출부, 모델 목록 | `bridges.echoguard()` |
+| ShockLens → kfin-eval | 팩터 충격 계산, 역스트레스테스트 | `bridges.shocklens()` |
+| kfin-eval → Collatio | 정답이 있는 문항과 모델의 실제 오답. 이것으로 가드의 재현율과 정밀도를 낸다 | `guardlink.py` |
+| kfin-eval → ShockLens | 엔진이 바뀌면 리스크 문항 정답이 바뀌었는지 CI가 알려 준다(정답지 점검). LLM 단계 평가는 아직 없다 | `ci.py`, ShockLens `.github/workflows/kfin-eval.yml` |
+| kfin-eval → Collatio | 모델 목록·호출 코드·가드가 바뀌면 CI가 고정 30문항으로 다시 잰다 | `ci.py`, Collatio `.github/workflows/kfin-eval.yml` |
+
+세 저장소는 서로의 코드를 복사하지 않는다. kfin-eval이 나머지 둘을 불러 쓴다.
+Collatio와 ShockLens는 kfin-eval이 없어도 혼자 돈다. 반대로 kfin-eval도 둘 없이 점수표와 난도 보정까지는 낸다
+(가드 점검과 일부 생성기만 건너뛴다).
+
+## 다음에 이을 수 있는 것
+
+지금은 만들지 않았다. 필요가 확인되면 붙인다.
+
+- **ShockLens의 LLM 단계 점검.** ShockLens는 뉴스를 LLM이 해석해 사건 강도를 정하고, 숫자는 코드가 계산한다.
+  LLM이 정한 강도가 틀리면 뒤의 계산이 전부 틀린다. 과거 사건 라이브러리(정답이 있는 26건)를 kfin-eval 문항으로 바꾸면
+  그 해석 단계의 정확도를 잴 수 있다.
+- **Collatio 필터를 kfin-eval 문항 위에서 통째로 돌리기.** 지금은 가드 함수 둘(G1, G3)만 쓴다. 출처·근거 가드까지 쓰려면
+  모델의 답 형식에 근거 칸을 넣어야 한다.
+- **실패 사례를 Collatio의 학습 가드에 먹이기.** kfin-eval이 쌓는 오답이 그 재료다. 지금은 오답 수가 적다.
+
+## 금융 밖으로 넓히는 법
+
+파이프라인에서 금융에 묶인 것은 문항을 만드는 부분뿐이다. 검사, 검수, 실행, 채점, 실패 수집, 난도 보정,
+검토자 점검, 기여 점수, 공개·비공개 분리는 분야를 가리지 않는다.
+
+새 분야는 `plugins/` 폴더에 파일 하나로 붙인다.
+
+```python
+# plugins/내분야.py
+def my_items(n, seed):
+    items = []
+    ...  # 문항과 정답을 만든다. 정답은 여기서 코드로 계산한다
+    items.append({
+        "id": "...", "domain": "분야 이름(자유)", "answer_type": "numeric",   # 또는 "choice"
+        "difficulty": 3, "author": "gen-내분야", "answer_source": "engine",
+        "question": "...", "answer": {"value": 12.3, "unit": "kg", "rel_tol": 0.01},
+        "sources": [{"title": "정답을 어떻게 냈는지", "as_of": "2026-11-22"}],
+        "meta": {"level": 3, "variant": "변형 이름"},
+    })
+    return items
+
+GENERATORS = {"내분야": my_items}
+```
+
+```bash
+python -m kfin_eval gen --source 내분야 --n 40 --seed 1
+python -m kfin_eval pipeline --models ... --authors gen-내분야 --run-id x
+```
+
+지켜야 할 것 세 가지:
+
+1. **정답은 코드가 낸다.** 사람이 판정해야 하는 문항은 `answer_source`를 빼고 검수자 2명의 승인을 받는다.
+2. **문항만 읽고 풀 수 있어야 한다.** 테스트에서 문항의 숫자만 다시 읽어 계산해 정답과 맞는지 확인한다.
+3. **같은 원자료에서 나온 문항은 `meta.group`을 같게 준다.** 통계와 공개·비공개 분리가 이 묶음 단위로 돈다.
+
+예시는 `plugins/units_inverse.py`다. 제조, 물류, 에너지, 보건 분야의 숫자로
+"증감률에서 과거 값을 거꾸로 계산하고 단위를 바꾸는" 문항을 만든다.
+
+## 분야를 넓힐 때의 한계
+
+- 코드로 정답을 낼 수 있는 문항은 계산과 규칙 적용에 한정된다. 판단이 필요한 문항은 어느 분야든 그 분야 사람이 있어야 한다.
+- 의료처럼 틀린 정답이 사람을 해칠 수 있는 분야는 전문가 검수 없이 문항을 공개하지 않는다.
+- 분야를 넓히는 것과 그 분야에서 쓸모가 있다는 것은 다르다. 한 분야에서 모델을 가르는 문항을 찾은 뒤에 넓힌다.

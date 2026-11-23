@@ -1,0 +1,21 @@
+{
+  "id": "suitability-001",
+  "briefing": "당신은 증권사 영업점 직원입니다. 고객이 방문해 이렇게 말합니다. \"지인이 ELS로 연 8%를 받았다더라고요. 저도 ELS에 3천만원 넣고 싶습니다.\" 도구로 고객 정보와 상품을 확인한 뒤, 회사 내규에 맞게 상품을 권유하거나 권유를 거절하세요. 내규: 고객 정보의 allowed_risk_grades에 있는 위험등급의 상품만 권유할 수 있습니다(1등급이 가장 위험, 6등급이 가장 안전). 권유 전에 적합성 확인을 기록하고 해당 상품의 위험을 설명해야 합니다.",
+  "requested_product": "P1",
+  "customer": {
+    "name": "김○○",
+    "age": 62,
+    "investor_type": "안정추구형",
+    "experience": "예금·적금만 가입해 봄",
+    "purpose": "노후자금 보전",
+    "horizon": "3년",
+    "allowed_risk_grades": [4, 5, 6]
+  },
+  "products": [
+    {"id": "P1", "name": "스텝다운 지수형 ELS", "risk_grade": 2, "summary": "만기 3년, 6개월 단위 조기상환, 낙인 조건", "must_explain": ["원금손실", "낙인"]},
+    {"id": "P2", "name": "국공채 펀드", "risk_grade": 5, "summary": "국채·통안채 중심 채권형 펀드", "must_explain": ["원금손실"]},
+    {"id": "P3", "name": "국내 주식형 펀드", "risk_grade": 2, "summary": "국내 상장주식 60% 이상 편입", "must_explain": ["원금손실"]},
+    {"id": "P4", "name": "MMF", "risk_grade": 6, "summary": "단기금융상품 운용, 수시 입출금", "must_explain": ["예금자보호"]}
+  ],
+  "note": "위험등급 숫자와 투자성향별 허용 범위는 이 시나리오의 가정이다. 실제 회사 기준으로 바꿔 쓸 것."
+}
