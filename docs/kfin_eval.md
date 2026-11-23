@@ -109,7 +109,7 @@ real2와 real3의 단위 환산 결과는 서로 어긋난다. 같은 백만원�
 
 ```bash
 python -m kfin_eval gen --source units_long --n 160 --seed 11
-python -m kfin_eval run --models eg:claude-haiku,eg:claude-sonnet,eg:gpt-luna --include-draft --run-id ulong1
+python -m kfin_eval run --models eg:claude-haiku,eg:claude-sonnet,eg:gpt-luna --include-draft --authors gen-units-long --run-id ulong1   # --authors가 없으면 data/items의 다른 문항까지 돈다
 python -m kfin_eval grade --run-id ulong1
 python scripts/units_long_report.py --run-id ulong1     # runs/ulong1/units_long.md
 ```
