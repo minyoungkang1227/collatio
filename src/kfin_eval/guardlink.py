@@ -146,3 +146,51 @@ def render(result, items):
     lines += [] if missed else ["없음"]
     lines += ["", f"가드가 잡은 오답 {len(caught)}개, 정답인데 검토로 넘긴 것 {len(false_alarm)}개.", ""]
     return "\n".join(lines) + "\n"
+
+
+def unit_check(items, responses, grades):
+    """단위 환산 점검(Collatio units)을 수치 문항의 응답에 돌린다. 정답은 성능을 셀 때만 쓴다.
+
+    {n, wrong, flagged, caught, false_flags, not_checked, rows}
+      caught       틀린 답 가운데 걸린 것
+      false_flags  맞은 답 가운데 걸린 것 (사람이 헛되이 보게 되는 것)
+      not_checked  풀이에 대조할 값도 식도 없어 판정하지 못한 것
+    """
+    U = bridges.collatio("units")
+    score = {(g["model"], g["item_id"]): g["score"] for g in grades}
+    out = {"n": 0, "wrong": 0, "flagged": 0, "caught": 0, "false_flags": 0, "not_checked": 0, "rows": []}
+    for r in responses:
+        it = items.get(r["item_id"])
+        key = (r["model"], r["item_id"])
+        if it is None or it["answer_type"] != "numeric" or key not in score:
+            continue
+        m = NUM_RE.search(final_answer(r["response"]).replace(",", "").replace("−", "-"))
+        if not m:
+            continue
+        verdict = U.check(r["response"], it["answer"].get("unit", ""), float(m.group()))
+        if not verdict.flagged:
+            again = U.recompute(r["response"])
+            if again.flagged or verdict.status == "검사 안 함":
+                verdict = again
+        right = score[key] >= 1
+        out["n"] += 1
+        out["wrong"] += not right
+        out["flagged"] += verdict.flagged
+        out["caught"] += verdict.flagged and not right
+        out["false_flags"] += verdict.flagged and right
+        out["not_checked"] += verdict.status == "검사 안 함"
+        if verdict.flagged or not right:
+            out["rows"].append({"model": r["model"], "item_id": r["item_id"], "right": bool(right), "status": verdict.status, "detail": verdict.detail})
+    return out
+
+
+def render_unit(res):
+    lines = [
+        "# 단위 환산 점검 (Collatio G7)", "",
+        f"- 수치 응답 {res['n']}개 가운데 오답 {res['wrong']}개",
+        f"- 걸린 것 {res['flagged']}개: 오답 {res['caught']}개, 정답 {res['false_flags']}개",
+        f"- 판정하지 못한 것 {res['not_checked']}개 (풀이에 환산 전 값도 계산식도 없음)", "",
+        "| 모델 | 문항 | 채점 | 판정 | 내용 |", "|---|---|---|---|---|",
+    ]
+    lines += [f"| {r['model']} | {r['item_id']} | {'정답' if r['right'] else '오답'} | {r['status']} | {r['detail']} |" for r in res["rows"]]
+    return "\n".join(lines) + "\n"

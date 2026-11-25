@@ -243,6 +243,18 @@ def cmd_guard_check(p, a):
     return 0
 
 
+def cmd_unit_check(p, a):
+    """수치 응답의 단위 환산·자릿수를 코드로 다시 계산해 본다(Collatio G7)."""
+    d = p.runs / a.run_id
+    items = {i["id"]: i for i in load_items(p.items)}
+    res = GL.unit_check(items, store.read_jsonl(d / "responses.jsonl"), store.read_jsonl(d / "grades.jsonl"))
+    text = GL.render_unit(res)
+    (d / "unit_check.md").write_text(text, encoding="utf-8")
+    store.log_event(p.log, "unit_check", run_id=a.run_id, n=res["n"], wrong=res["wrong"], caught=res["caught"], false_flags=res["false_flags"])
+    print(text)
+    return 0
+
+
 def cmd_pipeline(p, a):
     """검사 → 실행 → 채점 → 실패 수집 → 점수표 → 가드 점검을 한 번에."""
     ns = argparse.Namespace
@@ -467,6 +479,8 @@ def main(argv=None):
     r = sub.add_parser("guard-check", help="Collatio 가드가 틀린 다수결을 잡는지 점검")
     r.add_argument("--run-id", required=True)
     r.add_argument("--threshold", type=float, help="일치 기준(생략 시 Collatio 설정값)")
+    r = sub.add_parser("unit-check", help="수치 응답의 단위 환산·자릿수를 코드로 다시 계산해 대조")
+    r.add_argument("run_id")
     r = sub.add_parser("pipeline", help="검사부터 점수표·가드 점검까지 한 번에")
     r.add_argument("--models", required=True, help="예: eg:all 또는 eg:claude-haiku,eg:gpt-luna")
     r.add_argument("--run-id")
@@ -504,7 +518,7 @@ def main(argv=None):
     return {"validate": cmd_validate, "review": cmd_review, "status": cmd_status, "run": cmd_run,
             "grade": cmd_grade, "report": cmd_report, "verify-log": cmd_verify_log,
             "ci-key": cmd_ci_key, "ci-smoke": cmd_ci_smoke, "failures": cmd_failures,
-            "annotate": cmd_annotate, "probe-report": cmd_probe_report, "irt": cmd_irt, "calibrate": cmd_calibrate, "publish": cmd_publish, "probe-make": cmd_probe_make, "probe-score": cmd_probe_score, "score": cmd_score, "gen": cmd_gen, "guard-check": cmd_guard_check, "pipeline": cmd_pipeline, "failure-report": cmd_failure_report, "env-run": cmd_env_run}[a.cmd](Paths(a.root), a)
+            "annotate": cmd_annotate, "probe-report": cmd_probe_report, "irt": cmd_irt, "calibrate": cmd_calibrate, "publish": cmd_publish, "probe-make": cmd_probe_make, "probe-score": cmd_probe_score, "score": cmd_score, "gen": cmd_gen, "guard-check": cmd_guard_check, "unit-check": cmd_unit_check, "pipeline": cmd_pipeline, "failure-report": cmd_failure_report, "env-run": cmd_env_run}[a.cmd](Paths(a.root), a)
 
 
 if __name__ == "__main__":
