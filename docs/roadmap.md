@@ -17,6 +17,13 @@
 3. 숨긴 지시문은 실제로 따른 사례가 나왔는데, 점검은 정해 둔 문구를 찾는 수준이다.
 4. "여러 모델이 함께 틀리는가"는 여전히 시험하지 못했다. 쓴 모델들이 너무 잘해서다.
 
+## ModelAudit과의 연결 (2026-11-27)
+
+정형 모델(신용평가 등) 검증은 별도 저장소 [ModelAudit](https://github.com/minyoungkang1227/ModelAudit)에서 한다.
+Collatio는 그 도구의 LLM 점검을 맡는다. `python -m collatio.pipeline --run > collatio.json`으로 낸 결과를
+ModelAudit의 `python -m modelaudit llm --collatio collatio.json`이 읽어 같은 틀의 검증 보고서로 적는다.
+연결은 결과 파일 하나뿐이고 두 저장소의 코드는 서로를 불러 쓰지 않는다.
+
 ## 넓히는 방향
 
 지금의 Collatio는 "실적 공시의 숫자를 원문과 맞춰 본다"이다. 넓힌 모양은 이렇다.
