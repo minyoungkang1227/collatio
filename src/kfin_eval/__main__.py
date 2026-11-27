@@ -5,6 +5,7 @@ import json
 from collections import defaultdict
 from pathlib import Path
 
+from . import drill as DR
 from . import env as E
 from . import failures as F
 from . import gen as GEN
@@ -153,9 +154,39 @@ def cmd_report(p, a):
         lines.append(f"| {m} | {lo:.1f} ~ {hi:.1f} | " + " | ".join(cells) + " |")
     lines += ["", "모델별 구간이다. 두 모델의 우열은 아래 '모델 쌍 비교'의 차이 구간으로 판단한다."]
     text = "\n".join(lines) + "\n"
-    if len(by) >= 2:
-        text += "\n" + ST.render_pairwise(ST.pairwise(rows, group_of))
+    pair = ST.render_pairwise(ST.pairwise(rows, group_of)) if len(by) >= 2 else ""
+    if pair:
+        text += "\n" + pair
     (d / "scoreboard.md").write_text(text, encoding="utf-8")
+    print(text)
+    # 원칙 9: 받는 사람별 보고서. 다른 명령(pipeline 등)이 부를 때는 점수표만 낸다
+    audience = getattr(a, "audience", "none")
+    if audience in ("cto", "all"):
+        (d / "report_cto.md").write_text(DR.render_cto(a.run_id, rows, _items_by_id(p), pair), encoding="utf-8")
+    if audience in ("risk", "all"):
+        reviewers = {r["reviewer"] for r in store.read_jsonl(p.reviews)}
+        (d / "report_risk.md").write_text(DR.render_risk(a.run_id, rows, _items_by_id(p), store.read_jsonl(p.failures),
+                                                         store.read_jsonl(p.fail_ann), len(reviewers)), encoding="utf-8")
+    if audience != "none":
+        print(f"수신자별 보고서({audience}) → {d}")
+    return 0
+
+
+def _items_by_id(p):
+    return {i["id"]: i for i in load_items(p.items)}
+
+
+def cmd_drill(p, a):
+    """원칙 6: 점수표를 분야·난도·답 형식·변형·오류 유형별로 쪼개 본다."""
+    rows = store.read_jsonl(p.runs / a.run_id / "grades.jsonl")
+    if not rows:
+        raise SystemExit("채점 결과가 없습니다. 먼저 grade를 실행하세요.")
+    dims = tuple(x.strip() for x in a.by.split(",")) if a.by else tuple(DR.DIMS)
+    bad = [x for x in dims if x not in DR.DIMS]
+    if bad:
+        raise SystemExit(f"--by는 {', '.join(DR.DIMS)} 중에서: {bad}")
+    text = DR.render_drill(a.run_id, rows, _items_by_id(p), store.read_jsonl(p.failures), store.read_jsonl(p.fail_ann), dims)
+    (p.runs / a.run_id / "drill.md").write_text(text, encoding="utf-8")
     print(text)
     return 0
 
@@ -498,6 +529,11 @@ def main(argv=None):
     r.add_argument("--judge", help="서술형 LLM 채점자 모델(생략 시 키워드 채점)")
     r = sub.add_parser("report", help="점수표 생성")
     r.add_argument("--run-id", required=True)
+    r.add_argument("--audience", choices=["all", "cto", "risk", "none"], default="all",
+                   help="수신자별 보고서: cto(모델 선택), risk(위험 관리). 기본 둘 다")
+    r = sub.add_parser("drill", help="점수표를 분야·난도·형식·변형·오류 유형별로 쪼개 보기")
+    r.add_argument("--run-id", required=True)
+    r.add_argument("--by", default="", help="쉼표로 구분: domain,difficulty,answer_type,variant (기본 전부)")
     r = sub.add_parser("failures", help="채점 결과에서 틀린 응답을 실패 사례로 수집")
     r.add_argument("--run-id", required=True)
     r.add_argument("--threshold", type=float, default=1.0, help="이 점수 미만을 실패로 본다(0~1, 기본 1.0)")
@@ -556,7 +592,7 @@ def main(argv=None):
     r.add_argument("--no-guard", action="store_true", help="Collatio 가드 점검 생략")
     a = ap.parse_args(argv)
     return {"validate": cmd_validate, "review": cmd_review, "status": cmd_status, "run": cmd_run,
-            "grade": cmd_grade, "report": cmd_report, "verify-log": cmd_verify_log, "coverage": cmd_coverage,
+            "grade": cmd_grade, "report": cmd_report, "verify-log": cmd_verify_log, "coverage": cmd_coverage, "drill": cmd_drill,
             "ci-key": cmd_ci_key, "ci-smoke": cmd_ci_smoke, "failures": cmd_failures,
             "annotate": cmd_annotate, "probe-report": cmd_probe_report, "irt": cmd_irt, "calibrate": cmd_calibrate, "publish": cmd_publish, "probe-make": cmd_probe_make, "probe-score": cmd_probe_score, "score": cmd_score, "gen": cmd_gen, "guard-check": cmd_guard_check, "unit-check": cmd_unit_check, "pipeline": cmd_pipeline, "failure-report": cmd_failure_report, "env-run": cmd_env_run}[a.cmd](Paths(a.root), a)
 

@@ -475,3 +475,18 @@ python -m kfin_eval env-run --scenario suitability-001 --agents claude-fable-5-2
 2. 검수자 2명을 구한다(현업 종사자 또는 자격 보유자).
 3. 모델 3~4종으로 돌려 점수표를 공개한다.
 4. 문항 일부는 비공개 세트로 남긴다(공개 문항은 학습에 섞여 점수가 부풀 수 있다).
+
+## 쪼개 보기와 수신자별 보고서 (2026-11-27)
+
+BCBS 239 원칙 6(적응성)과 원칙 9(명확성·유용성)를 점수표에 적용했다.
+
+```
+python -m kfin_eval drill  --run-id real2                 # 분야·난도·답 형식·변형·오류 유형별 → runs/real2/drill.md
+python -m kfin_eval drill  --run-id real2 --by difficulty,variant
+python -m kfin_eval report --run-id real2                 # scoreboard.md + report_cto.md + report_risk.md
+python -m kfin_eval report --run-id real2 --audience none # 예전처럼 점수표만
+```
+
+- `drill`: 문항 5개 미만 칸에는 `*`를 붙인다. 오류 유형은 `annotate`로 붙인 것을 쓰고, 안 붙인 실패는 '미분류'로 센다.
+- `report_cto.md`: 어떤 모델을 쓸지 정하는 사람용. 순위, 분야별 최고 모델, 90점 미만 칸, 모델 쌍 비교.
+- `report_risk.md`: 위험을 관리하는 사람용. 약한 칸, 오류 유형, 틀린 문항 목록, 이 결과로 말할 수 없는 것(표본, 검수자 수).
