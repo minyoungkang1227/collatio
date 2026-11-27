@@ -431,6 +431,44 @@ def cmd_ci_smoke(p, a):
     return 0 if res["ok"] else 1
 
 
+def cmd_coverage(p, a):
+    """계획한 범위(config/coverage_plan.json)와 실제 문항을 비교해 빈 칸을 적는다."""
+    import collections
+    plan = json.loads((p.root / "config" / "coverage_plan.json").read_text(encoding="utf-8"))
+    items = load_items(p.items) + [i for f in (a.extra or []) for i in load_items(p.root / f)]
+    items = list({i["id"]: i for i in items}.values())
+    cnt = collections.Counter((i["domain"], i["difficulty"]) for i in items)
+    by_type = collections.Counter((i["domain"], i["answer_type"]) for i in items)
+    diffs, k = plan["difficulties"], plan["min_per_cell"]
+    lines = [f"# 평가 세트 커버리지", "", f"문항 {len(items)}개. 칸당 목표 {k}개. `kfin_eval coverage`로 다시 만든다.", "",
+             "## 분야 × 난도", "", "| 분야 | " + " | ".join(f"{d}단" for d in diffs) + " | 합계 |",
+             "|---|" + "---|" * (len(diffs) + 1)]
+    empty, thin = [], []
+    for dom in plan["domains"]:
+        row = [cnt[(dom, d)] for d in diffs]
+        lines.append(f"| {dom} | " + " | ".join(str(n) for n in row) + f" | {sum(row)} |")
+        empty += [f"{dom} {d}단" for d, n in zip(diffs, row) if n == 0]
+        thin += [f"{dom} {d}단({n})" for d, n in zip(diffs, row) if 0 < n < k]
+    extra = sorted({i["domain"] for i in items} - set(plan["domains"]))
+    lines += ["", "## 분야 × 답 형식", "", "| 분야 | " + " | ".join(plan["answer_types"]) + " |", "|---|" + "---|" * len(plan["answer_types"])]
+    for dom in plan["domains"]:
+        lines.append(f"| {dom} | " + " | ".join(str(by_type[(dom, t)]) for t in plan["answer_types"]) + " |")
+    lines += ["", "## 없는 것", "", f"- 빈 칸 {len(empty)}개: " + (", ".join(empty) or "없음"),
+              f"- 목표 미달 {len(thin)}개: " + (", ".join(thin) or "없음")]
+    if extra:
+        lines.append(f"- 계획에 없는 분야: {', '.join(extra)} (coverage_plan.json에 추가할지 정할 것)")
+    lines += [f"- {g}" for g in plan["known_gaps"]]
+    man = p.root / "dist" / "MANIFEST.json"
+    if man.exists():
+        n_priv = sum(1 for i in json.loads(man.read_text(encoding="utf-8"))["items"] if i.get("split") == "private")
+        lines += ["", f"센 범위: `data/items`와 {', '.join(a.extra or []) or '추가 파일 없음'}. "
+                  f"비공개 문항({n_priv}개, `dist/MANIFEST.json`)과 생성기로 다시 만드는 문항(`gen`)은 이 표에 없다."]
+    out = p.root / "docs" / "coverage.md"
+    out.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"{out} 작성. 빈 칸 {len(empty)}개, 목표 미달 {len(thin)}개")
+    return 0
+
+
 def cmd_verify_log(p, a):
     bad = store.verify_log(p.log)
     print("로그 정상" if not bad else f"변조 의심 줄: {bad}")
@@ -442,6 +480,8 @@ def main(argv=None):
     ap.add_argument("--root", default=".", help="프로젝트 폴더(기본: 현재 폴더)")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("validate", help="문항 형식·출처·중복 검사")
+    r = sub.add_parser("coverage", help="계획 범위 대비 문항 커버리지와 빈 칸 보고서")
+    r.add_argument("--extra", nargs="*", default=["dist/public.jsonl"], help="함께 셀 문항 파일(저장소 기준 경로)")
     r = sub.add_parser("review", help="검수 판정 기록")
     r.add_argument("--item", required=True)
     r.add_argument("--reviewer", required=True)
@@ -516,7 +556,7 @@ def main(argv=None):
     r.add_argument("--no-guard", action="store_true", help="Collatio 가드 점검 생략")
     a = ap.parse_args(argv)
     return {"validate": cmd_validate, "review": cmd_review, "status": cmd_status, "run": cmd_run,
-            "grade": cmd_grade, "report": cmd_report, "verify-log": cmd_verify_log,
+            "grade": cmd_grade, "report": cmd_report, "verify-log": cmd_verify_log, "coverage": cmd_coverage,
             "ci-key": cmd_ci_key, "ci-smoke": cmd_ci_smoke, "failures": cmd_failures,
             "annotate": cmd_annotate, "probe-report": cmd_probe_report, "irt": cmd_irt, "calibrate": cmd_calibrate, "publish": cmd_publish, "probe-make": cmd_probe_make, "probe-score": cmd_probe_score, "score": cmd_score, "gen": cmd_gen, "guard-check": cmd_guard_check, "unit-check": cmd_unit_check, "pipeline": cmd_pipeline, "failure-report": cmd_failure_report, "env-run": cmd_env_run}[a.cmd](Paths(a.root), a)
 

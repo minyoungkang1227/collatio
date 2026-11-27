@@ -58,7 +58,8 @@ PYTHONPATH=src python -m kfin_eval ci-smoke --models mock-perfect,mock-noisy  # 
 
 ## 문서
 
-다음 방향 [docs/roadmap.md](docs/roadmap.md) · 결과 [docs/findings.md](docs/findings.md) · 실험 기록 [docs/pilot_log.md](docs/pilot_log.md) · 가설과 분석 방법 [docs/experiment_spec.md](docs/experiment_spec.md) · 선행연구 [docs/related_work.md](docs/related_work.md) · 코드 구조 [docs/architecture.md](docs/architecture.md)
+다음 방향 [docs/roadmap.md](docs/roadmap.md) · 결과 [docs/findings.md](docs/findings.md) · 실험 기록 [docs/pilot_log.md](docs/pilot_log.md) · 가설과 분석 방법 [docs/experiment_spec.md](docs/experiment_spec.md) · 선행연구 [docs/related_work.md](docs/related_work.md) · 코드 구조 [docs/architecture.md](docs/architecture.md)  
+데이터 규칙 [docs/data_dictionary.md](docs/data_dictionary.md) · 평가 세트 커버리지 [docs/coverage.md](docs/coverage.md)
 
 ## 실행
 

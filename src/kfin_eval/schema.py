@@ -9,6 +9,8 @@ ANSWER_TYPES = {"numeric", "choice", "rubric"}
 # 이 필드가 바뀌면 문항이 바뀐 것으로 보고 기존 검수를 무효화한다.
 CONTENT_FIELDS = ("question", "answer_type", "answer", "choices", "rubric", "sources")
 STALE_DAYS = 365
+# 원문 대조 수준. primary: 법령 원문(국가법령정보센터 등) 직접 확인, secondary: 해설·보도자료 등 2차 자료로 확인
+VERIFY_LEVELS = ("primary", "secondary")
 
 
 def content_hash(item):
@@ -71,6 +73,20 @@ def validate_item(item, today=None):
             warn.append(f"sources[{i}] 기준일이 {STALE_DAYS}일 초과: 재검증 필요")
         if item["domain"] == "regulation" and not s.get("ref"):
             warn.append(f"sources[{i}].ref(조문 번호) 없음")
+        v = s.get("verified")
+        if v is not None:
+            if not isinstance(v, dict) or not _is_date(v.get("date")) or not v.get("by") or v.get("level") not in VERIFY_LEVELS:
+                err.append(f"sources[{i}].verified는 date(YYYY-MM-DD)·by·level({'/'.join(VERIFY_LEVELS)}) 필요")
+        if item["domain"] == "regulation":
+            if v is None:
+                warn.append(f"sources[{i}] 원문 대조 기록(verified) 없음")
+            elif isinstance(v, dict) and v.get("level") != "primary":
+                warn.append(f"sources[{i}] 2차 출처로만 대조됨: 국가법령정보센터 원문 확인 필요")
+
+    # 수작업 수정 기록: 사람이 문항을 고치면 언제·누가·왜를 남긴다(BCBS 239 원칙 3).
+    for j, c in enumerate(item.get("changes") or []):
+        if not isinstance(c, dict) or not _is_date(c.get("date")) or not c.get("by") or not c.get("reason"):
+            err.append(f"changes[{j}]는 date(YYYY-MM-DD)·by·reason 필요")
 
     a, t = item["answer"], item["answer_type"]
     if t == "numeric":
