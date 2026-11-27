@@ -2,7 +2,6 @@
 
 [![tests](https://github.com/minyoungkang1227/collatio/actions/workflows/tests.yml/badge.svg)](https://github.com/minyoungkang1227/collatio/actions/workflows/tests.yml)
 
-> 이름: collatio는 라틴어로 필사본을 원본과 한 줄씩 맞춰 보는 일이다. 2026-11-22까지의 이름은 EchoGuard였다. 여러 AI가 서로의 메아리가 된다는 처음 가설에서 온 이름인데, 실험이 가리킨 것은 원문 대조였다.
 
 금융회사가 AI에 문서를 읽힐 때, 틀린 답이 그대로 쓰이지 않게 거르는 장치와 그것을 시험한 기록.
 
